@@ -1,0 +1,208 @@
+/* Main layout container */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
+
+
+
+/* Main content area */
+.main-content-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #ffffff;
+  transition: margin-left 0.3s ease, padding-top 0.2s ease;
+  margin-left: var(--sidebar-width, 256px);
+  padding-top: calc(var(--topbar-height, 64px) + var(--topbar-offset, 0px));
+}
+
+/* When the sidebar is collapsed (narrow), shift content left accordingly */
+.sidebar-collapsed ~ .main-content-container,
+.main-content-container.sidebar-collapsed {
+  margin-left: var(--sidebar-width-collapsed, 78px);
+}
+
+/* When using the `.sidebar-container` wrapper (as in App.jsx),
+   shift the sibling main content appropriately */
+.sidebar-container.sidebar-collapsed ~ .main-content-container {
+  margin-left: var(--sidebar-width-collapsed, 78px);
+}
+.sidebar-container.sidebar-expanded ~ .main-content-container {
+  margin-left: var(--sidebar-width, 256px);
+}
+
+@media (max-width: 1024px) {
+  .main-content-container,
+  .sidebar-collapsed ~ .main-content-container,
+  .sidebar-container.sidebar-collapsed ~ .main-content-container,
+  .sidebar-container.sidebar-expanded ~ .main-content-container {
+    margin-left: 0;
+    padding-top: calc(var(--topbar-height, 64px) + var(--topbar-offset, 0px) + 0.75rem);
+  }
+
+  .main-content {
+    padding-top: 0.5rem;
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --topbar-offset: 0px;
+  }
+
+  .main-content-container {
+    padding-top: calc(var(--topbar-height, 56px) + var(--topbar-offset, 0px));
+  }
+}
+
+/* Topbar spacing variable fallback */
+:root {
+  --topbar-height: 64px;
+  --topbar-offset: 0px;
+}
+
+/* Prevent body scroll when mobile sidebar is open (class toggled in AppLayout) */
+.no-scroll {
+  overflow: hidden !important;
+  height: 100vh !important;
+}
+
+/* Make the area that contains page routes scrollable (so footer/pagination is reachable) */
+.content-scrollable {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 1.75rem 2.25rem 2.75rem;
+}
+
+.app-footer {
+  flex-shrink: 0;
+  padding: 1rem 2.25rem 1.5rem;
+  border-top: 1px solid #eceef5;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fafc 100%);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.footer-left,
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.footer-title {
+  font-weight: 600;
+  color: #111827;
+}
+
+.footer-divider {
+  color: #d1d5db;
+}
+
+@media (max-width: 768px) {
+  .app-footer {
+    padding: 1rem 1.5rem 1.5rem;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.main-content {
+  min-height: 100%;
+}
+
+/* Prevent inner pages from using viewport-based fixed heights which break inside the scrollable container.
+  Many module pages set `height: calc(100vh - X)` - override those when they're inside `.content-scrollable`. */
+.content-scrollable [class$="-layout"],
+.content-scrollable .parts-layout,
+.content-scrollable .suppliers-layout,
+.content-scrollable .products-layout,
+.content-scrollable .containers-layout {
+  height: auto !important;
+  min-height: 100%;
+}
+
+/* --- Sidebar priority fix --- */
+.sidebar-container {
+  z-index: 1001 !important;
+}
+
+.sidebar-overlay {
+  /* Overlay that covers main content when sidebar is open.
+     By default (mobile) it covers full width of viewport below the top bar.
+     On desktop it will start after the sidebar so the sidebar itself remains clickable. */
+  position: fixed;
+  top: var(--topbar-height, 64px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.32);
+  z-index: 1000;
+  display: none;
+  transition: opacity 0.2s ease, left 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* On larger screens, don't cover the sidebar itself; start overlay after sidebar width */
+@media (min-width: 1024px) {
+  .sidebar-overlay {
+    left: var(--sidebar-width, 256px);
+    right: 0;
+    bottom: 0;
+  }
+
+  /* If the sidebar is collapsed, start after the collapsed width */
+  .sidebar.collapsed + .sidebar-overlay,
+  .sidebar-container.sidebar-collapsed .sidebar-overlay {
+    left: var(--sidebar-width-collapsed, 78px);
+  }
+}
+
+/* Invisible click-catcher used to close the sidebar without a visible overlay */
+.sidebar-click-catcher {
+  position: fixed;
+  top: var(--topbar-height, 64px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  pointer-events: none; /* disabled by default */
+}
+
+.sidebar-click-catcher.active {
+  pointer-events: auto; /* enable clicks */
+}
+
+@media (min-width: 1024px) {
+  /* don't cover the sidebar area on desktop */
+  .sidebar-click-catcher {
+    left: var(--sidebar-width, 256px);
+  }
+
+  .sidebar.collapsed + .sidebar-click-catcher,
+  .sidebar-container.sidebar-collapsed .sidebar-click-catcher {
+    left: var(--sidebar-width-collapsed, 78px);
+  }
+}
+
+.mobile-detail-backdrop {
+  z-index: 900 !important;
+}

@@ -1,0 +1,211 @@
+.list-panel,
+.part-list-panel,
+.location-list-panel,
+.po-list-panel {
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 20px;
+  box-shadow: 0 18px 40px rgba(17, 22, 40, 0.1);
+  overflow: hidden;
+}
+
+.list-panel-header,
+.panel-header {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  background: #f9fafb;
+}
+
+.list-panel-header h1,
+.list-panel-header h2,
+.panel-header h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.list-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.list-search,
+.search-bar,
+.search-box {
+  position: relative;
+  width: 100%;
+}
+
+.list-search input,
+.search-bar input,
+.search-input {
+  width: 100%;
+  padding: 0.65rem 0.85rem 0.65rem 2.4rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.55rem;
+  font-size: 0.95rem;
+  background: #ffffff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.list-search input:focus,
+.search-bar input:focus,
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.search-icon,
+.search-box svg {
+  position: absolute;
+  left: 0.9rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.list-filter,
+.filter-bar,
+.panel-header select {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.list-filter select,
+.filter-bar select,
+.panel-header select {
+  flex: 1;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  background: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.list-body,
+.part-list,
+.po-list,
+.location-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 0.85rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  background: #fff;
+}
+
+.list-item,
+.part-list-item,
+.po-list-item,
+.location-list-item {
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.list-item:hover,
+.part-list-item:hover,
+.po-list-item:hover,
+.location-list-item:hover {
+  border-color: rgba(17, 23, 41, 0.25);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.list-item.selected,
+.part-list-item.selected,
+.po-list-item.selected,
+.location-list-item.selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.3);
+}
+
+.list-panel-footer,
+.po-pagination,
+.location-list-footer {
+  padding: 0.85rem 1.4rem;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pagination,
+.po-pagination-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.pagination-btn,
+.po-pagination-btn {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0.4rem 1rem;
+  min-width: 72px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled),
+.po-pagination-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.pagination-btn:disabled,
+.po-pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-indicator,
+.po-pagination-page {
+  font-size: 0.85rem;
+  color: #6b7280;
+  padding: 0 0.35rem;
+  white-space: nowrap;
+}
+.list-item h3,
+.part-list-item h3,
+.po-list-item h3,
+.location-list-item h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.35rem;
+}
+
+.list-item p,
+.part-list-item p,
+.po-list-item p,
+.location-list-item p {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}

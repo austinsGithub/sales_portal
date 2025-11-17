@@ -1,0 +1,413 @@
+/* ========================================================================= */
+/* 1. Root Variables & Theme */
+/* ========================================================================= */
+:root {
+  /* Colors */
+  --color-primary: #3b82f6; /* Blue 500 */
+  --color-primary-hover: #2563eb; /* Blue 600 */
+  --color-error: #dc2626; /* Red 600 */
+  --color-error-hover: #b91c1c; /* Red 700 */
+  --color-error-dark: #991b1b; /* Red 800 */
+  --color-error-bg: rgba(220, 38, 38, 0.05);
+  
+  --color-surface: #ffffff;
+  --color-background: #f9fafb; /* Gray 50 */
+  --color-border: #e5e7eb; /* Gray 200 */
+  
+  --color-text: #111827; /* Gray 900 */
+  --color-text-secondary: #6b7280; /* Gray 500 */
+  
+  /* Focus Ring */
+  --color-focus-ring: rgba(59, 130, 246, 0.2);
+
+  /* Sizing & Shadow */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  
+  /* Transitions */
+  --transition-all: all 0.15s ease-in-out;
+}
+
+/* ========================================================================= */
+/* 2. Main Container & Header */
+/* ========================================================================= */
+.po-line-items {
+  margin-top: 1.5rem;
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.po-line-items .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.po-line-items .header h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  line-height: 1.25;
+}
+
+/* ========================================================================= */
+/* 3. Table Styles */
+/* ========================================================================= */
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.po-line-items table {
+  width: 100%;
+  min-width: 640px; /*  min width for scrolling */
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.po-line-items thead {
+  background-color: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.po-line-items th {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+.po-line-items th:first-child {
+  padding-left: 1.5rem;
+}
+
+.po-line-items th:last-child {
+  padding-right: 1.5rem;
+}
+
+.po-line-items tbody tr {
+  background: var(--color-surface);
+  transition: background-color 0.15s ease;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.po-line-items tbody tr:last-child {
+  border-bottom: none;
+}
+
+.po-line-items tbody tr:hover {
+  background-color: var(--color-background);
+}
+
+.po-line-items tbody tr.is-editing {
+  background-color: rgba(59, 130, 246, 0.05); /* Subtle blue tint */
+}
+
+.po-line-items td {
+  padding: 1rem;
+  color: var(--color-text-secondary);
+  vertical-align: middle;
+  transition: var(--transition-all);
+}
+
+.po-line-items td:first-child {
+  padding-left: 1.5rem;
+}
+
+.po-line-items td:last-child {
+  padding-right: 1.5rem;
+}
+
+/* Cell specific styles */
+.po-line-items .part-number {
+  font-weight: 600;
+  color: var(--color-text);
+  display: block;
+}
+
+.po-line-items .description {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  max-width: 300px; 
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.po-line-items .notes {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.25rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+/* Numeric cells */
+.po-line-items .numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Table footer (Subtotal) */
+.po-line-items tfoot {
+  background-color: var(--color-background);
+  border-top: 1px solid var(--color-border);
+  font-weight: 600;
+}
+
+.po-line-items tfoot td {
+  padding: 1rem 1.5rem;
+  color: var(--color-text);
+  text-align: right;
+}
+
+/* Empty state */
+.po-line-items .empty-state-cell {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+/* ========================================================================= */
+/* 4. Action Buttons (In Table) */
+/* ========================================================================= */
+.po-line-items .actions {
+  opacity: 1;
+  display: flex;
+  gap: 0.25rem;
+  justify-content: flex-end;
+}
+
+.po-line-items .action-btn {
+  padding: 0.375rem;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  transition: var(--transition-all);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.po-line-items .action-btn:hover {
+  background-color: var(--color-background);
+  border-color: var(--color-border);
+}
+
+.po-line-items .action-btn.edit {
+  color: var(--color-primary);
+}
+.po-line-items .action-btn.edit:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.2);
+}
+
+.po-line-items .action-btn.delete {
+  color: var(--color-error);
+}
+.po-line-items .action-btn.delete:hover {
+  background-color: rgba(220, 38, 38, 0.1);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+/* ========================================================================= */
+/* 5. Form Styles (Add/Edit Line) */
+/* ========================================================================= */
+.po-line-items .line-form {
+  background-color: var(--color-background);
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.po-line-items .form-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr; /* Part, Qty, Price */
+  gap: 1.25rem;
+}
+
+.po-line-items .line-form label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 0.25rem;
+}
+
+.po-line-items .line-form select,
+.po-line-items .line-form input[type="number"],
+.po-line-items .line-form input[type="text"],
+.po-line-items .line-form textarea {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.po-line-items .line-form select:focus,
+.po-line-items .line-form input[type="number"]:focus,
+.po-line-items .line-form input[type="text"]:focus,
+.po-line-items .line-form textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.po-line-items .line-form textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.po-line-items .price-input-wrapper {
+  position: relative;
+}
+
+.po-line-items .price-input-prefix {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  pointer-events: none;
+}
+
+.po-line-items .line-form input.price-input {
+  padding-left: 1.75rem;
+}
+
+.po-line-items .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+/* ========================================================================= */
+/* 6. General Button Styles (Header & Form) */
+/* ========================================================================= */
+.po-line-items .btn {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-all);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid transparent;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.po-line-items .btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.po-line-items .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.po-line-items .btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+.po-line-items .btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
+
+.po-line-items .btn-outline {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+.po-line-items .btn-outline:hover:not(:disabled) {
+  background-color: var(--color-background);
+  border-color: var(--color-text-secondary);
+}
+
+/* ========================================================================= */
+/* 7. Error Message */
+/* ========================================================================= */
+.po-line-items .error-message {
+  background-color: var(--color-error-bg);
+  border-left: 4px solid var(--color-error);
+  padding: 1rem;
+  margin: 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.po-line-items .error-message .icon {
+  color: var(--color-error);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.po-line-items .error-message p {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-error-dark);
+  line-height: 1.5;
+}
+
+/* ========================================================================= */
+/* 8. Responsive Adjustments */
+/* ========================================================================= */
+@media (max-width: 768px) {
+  .po-line-items .form-grid {
+    grid-template-columns: 1fr; /* Stack form fields vertically */
+  }
+  
+  .po-line-items .form-actions {
+    flex-direction: column-reverse; /* Stack buttons, primary on top */
+  }
+  
+  .po-line-items .btn {
+    width: 100%;
+  }
+
+  .po-line-items .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+}

@@ -1,0 +1,352 @@
+/*
+  MODERNIZED DASHBOARD STYLES
+  - Clean Typography (Inter)
+  - Updated Color Palette (Focus on subtle shades and a vibrant primary color)
+  - Enhanced Shadows and Borders
+*/
+
+/* Base Styles & Layout */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f4f7fa; /* Light, modern background */
+    margin: 0;
+    padding: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.dashboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* --- Header --- */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.dashboard-title {
+    font-size: 2.5rem; /* Slightly larger */
+    font-weight: 800; /* Extra bold */
+    color: #1e293b; /* Dark text */
+}
+
+.dashboard-subtitle {
+    font-size: 1.125rem;
+    color: #64748b;
+    margin-top: 0.5rem;
+}
+
+.dashboard-date {
+    font-size: 1rem;
+    color: #475569;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* --- KPI Cards --- */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.kpi-card {
+    background-color: #ffffff;
+    border-radius: 1rem; /* Consistent large radius */
+    padding: 1.5rem;
+    /* Elevated shadow for modern feel */
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+    border: 1px solid #f0f4f8; /* Very subtle border */
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.2s ease-out;
+}
+
+.kpi-card:hover {
+    transform: translateY(-2px); /* Subtle lift on hover */
+}
+
+.kpi-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-value {
+    font-size: 2.5rem; /* Larger and bolder value */
+    font-weight: 800;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+}
+
+.kpi-trend {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #10b981; /* Tailwind emerald-500 for positive */
+    padding-top: 0.25rem;
+}
+/* You may want to add a class for negative trends */
+.kpi-trend.negative {
+    color: #ef4444; /* Tailwind red-500 */
+}
+
+/* --- Filters Bar --- */
+.filters-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    background-color: #ffffff;
+    border-radius: 1rem;
+    padding: 1.5rem 2rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 2rem;
+    align-items: center;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.filter-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #475569;
+}
+
+.filter-select {
+    padding: 0.6rem 2.5rem 0.6rem 1rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.6rem;
+    background-color: #ffffff;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #334155;
+    appearance: none;
+    /* Custom chevron icon */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.75rem center;
+    background-repeat: no-repeat;
+    background-size: 1em 1em;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.filter-select:focus {
+    border-color: #6366F1; /* Primary color focus */
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* --- Chart & List Cards --- */
+/* The main grid structure is still managed by the React component using Tailwind classes for max-w-7xl, grid-cols-1/2, and gap. */
+
+.chart-card {
+    background-color: #ffffff;
+    border-radius: 1rem;
+    padding: 1.5rem;
+    border: 1px solid #f0f4f8;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.chart-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #1e293b;
+    /* Override component's old margin-bottom */
+    margin-bottom: 0;
+}
+
+/* YTD Sales Chart - Using component Tailwind classes and then overriding with ECharts styling */
+.max-w-7xl.mx-auto .bg-white.rounded-2xl {
+    /* Ensure the component's card structure is clean */
+    border-radius: 1rem;
+    padding: 1.5rem;
+    border: 1px solid #f0f4f8;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+}
+
+/* --- Top Products List --- */
+.products-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem; /* Increased spacing */
+}
+
+.product-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto; /* Rank, Name/Stats, Revenue */
+    align-items: center;
+    gap: 1rem;
+    position: relative;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #f1f5f9; /* Subtle separator */
+}
+.products-list .product-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+
+.product-rank {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #94a3b8;
+}
+
+.product-name {
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.25rem;
+    font-size: 1rem;
+}
+
+.product-stats {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    font-size: 0.875rem;
+    color: #64748b;
+    grid-column: 2 / 3; /* Span under the name */
+}
+
+.product-units {
+    font-weight: 500;
+}
+
+.product-revenue {
+    font-weight: 700;
+    color: #1e293b;
+    grid-column: 3 / 4;
+    text-align: right;
+    font-size: 1.125rem;
+}
+
+.product-progress {
+    position: absolute;
+    bottom: 0;
+    left: 40px; /* Aligned with product name */
+    right: 0;
+    height: 4px; /* Thinner progress bar */
+    background-color: #e2e8f0;
+    border-radius: 2px;
+    overflow: hidden;
+    grid-column: 2 / 4;
+}
+
+.product-progress-bar {
+    height: 100%;
+    background-color: #6366F1; /* Primary brand color */
+    border-radius: 2px;
+    transition: width 0.3s ease-in-out;
+}
+
+/* --- Inventory Alerts --- */
+.alerts-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem; /* Tighter gap */
+}
+
+.alert-card {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    transition: border-color 0.2s;
+}
+
+.alert-card:hover {
+    border-color: #cbd5e1;
+}
+
+.alert-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.alert-product {
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.alert-status {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.3rem 0.6rem;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+/* Color accents updated for better contrast */
+.alert-status.critical { background-color: #fecaca; color: #b91c1c; } /* Red-200/Red-700 */
+.alert-status.low { background-color: #fcd34d; color: #92400e; } /* Amber-300/Amber-800 */
+.alert-status.good { background-color: #a7f3d0; color: #065f46; } /* Teal-200/Teal-700 */
+
+.alert-progress {
+    height: 6px;
+    background-color: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.alert-progress-bar { height: 100%; border-radius: 3px; }
+.alert-progress-bar.critical { background-color: #ef4444; }
+.alert-progress-bar.low { background-color: #f59e42; }
+.alert-progress-bar.good { background-color: #22c55e; }
+
+.alert-stats {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.875rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+/* --- Loading Spinner --- */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 80vh;
+}
+.loading-spinner {
+    border: 5px solid #e2e8f0;
+    border-top: 5px solid #0004ff; /* Primary color for spinner */
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.loading-text { font-size: 1.125rem; color: #475569; font-weight: 500; }

@@ -1,19 +1,20 @@
 /* Login Page Styles - Clean Professional Biomedical Portal Design
    MODIFIED TO MATCH DASHBOARD PALETTE
 */
+
 .login-page {
   min-height: 100vh;
   width: 100%;
   margin: 0;
   padding: clamp(1rem, 3vw, 3rem);
-  /* MOD: Simple, light gray background */
-  background: #f8f9fa;
+  background: #f4f6fb;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
   color: #0f172a;
+  font-family: "Inter", "Manrope", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
 }
 
 .login-background {
@@ -62,16 +63,18 @@
 .login-grid {
   position: relative;
   z-index: 2;
-  width: min(1200px, 100%);
+  width: min(1350px, 100%);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: clamp(2rem, 4vw, 4rem);
   align-items: center;
+  padding: clamp(1rem, 2vw, 2rem);
 }
 
 .login-hero {
   color: #0f172a;
-  padding: clamp(1rem, 2vw, 2rem);
+  padding: clamp(1rem, 2vw, 2.5rem);
+  max-width: 520px;
 }
 
 .login-hero__badge {
@@ -80,20 +83,20 @@
   gap: 0.35rem;
   padding: 0.35rem 0.85rem;
   border-radius: 999px;
-  /* MOD: Use the new blue for the badge */
-  background: rgba(74, 105, 225, 0.08);
-  color: #4A69E1;
+  background: rgba(59, 91, 219, 0.1);
+  color: #3b5bdb;
   font-size: 0.85rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  border: 1px solid rgba(59, 91, 219, 0.2);
 }
 
 .login-hero__subtext {
   margin: 0.4rem 0 0;
-  color: rgba(15, 23, 42, 0.75);
+  color: rgba(15, 23, 42, 0.65);
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   font-size: 0.85rem;
 }
@@ -101,23 +104,23 @@
 .login-hero h1 {
   font-size: clamp(2.2rem, 4vw, 3rem);
   line-height: 1.15;
-  margin: 1rem 0 1.25rem;
+  margin: 1rem 0 0.5rem;
   color: #0f172a;
   font-weight: 700;
 }
 
 .login-hero h1 span {
   display: block;
-  color: #000000;
+  color: #1f2a44;
   font-weight: 500;
 }
 
 .login-hero p {
   max-width: 480px;
-  color: #334155;
+  color: #475569;
   font-size: 1rem;
   line-height: 1.6;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
 .login-hero__perks {
@@ -130,46 +133,39 @@
 }
 
 .login-hero__perks li {
-  padding: 0.5rem 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 1.15rem;
   border-radius: 999px;
   border: 1px solid rgba(148, 163, 184, 0.25);
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.8);
   color: #1e293b;
-  font-size: 0.85rem;
+  font-size: 0.87rem;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
 
-.login-card {
-  /* Clean white card with elegant shadow */
-  background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(226, 232, 240, 0.7);
-  border-radius: 28px;
-  box-shadow: 
-    0 20px 60px rgba(15, 23, 42, 0.08),
-    0 8px 16px rgba(15, 23, 42, 0.04),
-    0 0 1px rgba(15, 23, 42, 0.1);
-  padding: clamp(2.5rem, 5vw, 3.5rem);
-  width: 100%;
-  max-width: 460px;
-  text-align: center;
-  color: #0f172a;
-  margin: 0 auto 0;
-  position: relative;
-  /* Prevent any movement */
-  transform: translateZ(0);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
+.login-hero__perks li::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4A69E1, #17c9ff);
 }
 
-.login-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  /* MOD: Use new blue for the inner border */
-  border: 1px solid rgba(74, 105, 225, 0.08);
-  pointer-events: none;
+.login-card {
+  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 24px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  padding: clamp(2.25rem, 4vw, 3.25rem);
+  width: 100%;
+  max-width: 520px;
+  text-align: center;
+  color: #0f172a;
+  margin: 0 auto;
+  position: relative;
 }
 
 /* Removed top accent line */
@@ -181,17 +177,14 @@
   justify-content: center;
   margin: 0 auto 2rem auto;
   animation: iconPop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
-  width: 80px;
-  height: 80px;
-  border-radius: 20px;
-  /* MOD: Solid blue background */
-  background: #4A69E1;
-  /* MOD: Updated shadow for new solid color */
+  width: 84px;
+  height: 84px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #4A69E1, #6a5de7);
   box-shadow: 
-    0 10px 30px rgba(74, 105, 225, 0.25),
-    0 4px 12px rgba(74, 105, 225, 0.15);
+    0 15px 35px rgba(74, 105, 225, 0.35),
+    0 6px 16px rgba(74, 105, 225, 0.2);
   position: relative;
-  /* Prevent any movement */
   transform: translateZ(0);
 }
 
@@ -209,9 +202,11 @@
   color: #0f172a;
   font-size: 36px;
   font-weight: 800;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   margin-top: 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  text-align: center;
 }
 
 .login-card__subtitle {
@@ -219,8 +214,9 @@
   font-size: 16px;
   margin-bottom: 36px;
   margin-top: 0;
-  font-weight: 500;
-  letter-spacing: 0.2px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-align: center;
 }
 
 .login-form {
@@ -229,13 +225,22 @@
 
 .form-group {
   margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: transform 0.2s ease, filter 0.2s ease;
+}
+
+.form-group:focus-within {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 6px 16px rgba(74, 105, 225, 0.08));
 }
 
 .form-label {
   display: block;
   color: #1e293b;
   font-weight: 700;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -244,23 +249,23 @@
 .form-input {
   width: 100%;
   padding: 14px 18px;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  border: 1.5px solid rgba(148, 163, 184, 0.6);
+  border-radius: 14px;
   font-size: 16px;
-  background: #f8fafc;
+  background: #fdfdff;
   color: #0f172a;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-sizing: border-box;
   font-weight: 500;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
 .form-input:focus {
   outline: none;
-  /* MOD: Use new blue for focus */
   border-color: #4A69E1;
   box-shadow: 
-    0 0 0 4px rgba(74, 105, 225, 0.12),
-    0 4px 12px rgba(74, 105, 225, 0.08);
+    0 0 0 3px rgba(74, 105, 225, 0.15),
+    0 6px 18px rgba(74, 105, 225, 0.12);
   background: #ffffff;
 }
 
@@ -330,31 +335,28 @@
 
 .login-button {
   width: 100%;
-  /* MOD: Use new blue */
   background-color: #4A69E1;
   color: #fff;
   border: none;
   padding: 16px 24px;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
   margin-bottom: 28px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 24px rgba(74, 105, 225, 0.3);
 }
 
 .login-button:hover:not(:disabled) {
-  /* MOD: Use new darker blue */
   background-color: #3b5bdb;
+  box-shadow: 0 14px 28px rgba(59, 91, 219, 0.3);
 }
 
 .login-button:active:not(:disabled) {
-  /* MOD: Use new darkest blue */
-  background-color: #314eb9;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: #3146b6;
 }
 
 .login-button:disabled {
@@ -483,6 +485,7 @@
 
   .login-hero {
     text-align: center;
+    padding: 2rem 1.5rem;
   }
 
   .login-hero__perks {

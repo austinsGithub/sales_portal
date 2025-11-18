@@ -79,5 +79,116 @@ export const ProcurementLocationsModel = {
       `UPDATE locations SET is_active = 0 WHERE company_id = ? AND location_id = ? AND location_type = 'warehouse'`,
       [company_id, location_id]
     );
+  },
+
+  async getInventoryByLocation({ company_id, location_id, q, limit, offset }) {
+    if (!location_id) {
+      return {
+        items: [],
+        total: 0,
+        summary: {
+          totalQuantityOnHand: 0,
+          totalQuantityAvailable: 0,
+          totalQuantityReserved: 0,
+          uniquePartCount: 0,
+          uniqueSkuCount: 0
+        }
+      };
+    }
+
+    const parsedLimit = Number.parseInt(limit, 10);
+    const parsedOffset = Number.parseInt(offset, 10);
+    const limitValue = Number.isFinite(parsedLimit) ? Math.max(parsedLimit, 1) : 25;
+    const offsetValue = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
+
+    const baseParams = [company_id, location_id];
+    let searchClause = '';
+    let searchParams = [];
+
+    if (q) {
+      searchClause = ` AND (
+        p.product_name LIKE ? OR
+        p.sku LIKE ? OR
+        p.description LIKE ? OR
+        s.supplier_name LIKE ? OR
+        lt.lot_number LIKE ? OR
+        lt.supplier_lot_number LIKE ? OR
+        i.serial_number LIKE ?
+      )`;
+      const like = `%${q}%`;
+      searchParams = [like, like, like, like, like, like, like];
+    }
+
+    const selectSql = `
+      SELECT
+        i.inventory_id,
+        i.part_id,
+        i.lot_id,
+        p.product_name,
+        p.sku,
+        p.category,
+        i.quantity_on_hand,
+        i.quantity_available,
+        i.quantity_reserved,
+        i.serial_number,
+        i.received_date,
+        s.supplier_name,
+        lt.lot_number,
+        lt.supplier_lot_number,
+        lt.manufacture_date,
+        lt.expiration_date,
+        CASE
+          WHEN lt.expiration_date IS NULL THEN 'No Expiration'
+          WHEN lt.expiration_date < CURDATE() THEN 'Expired'
+          WHEN lt.expiration_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) THEN 'Expiring Soon'
+          ELSE 'Active'
+        END AS status
+      FROM inventory i
+      LEFT JOIN parts p ON i.part_id = p.part_id
+      LEFT JOIN suppliers s ON i.supplier_id = s.supplier_id
+      LEFT JOIN lots lt ON i.lot_id = lt.lot_id
+      WHERE i.company_id = ?
+        AND i.location_id = ?
+        AND i.is_active = 1
+        ${searchClause}
+      ORDER BY p.product_name ASC, lt.expiration_date ASC
+      LIMIT ? OFFSET ?
+    `;
+
+    const summarySql = `
+      SELECT
+        COUNT(*) AS totalItems,
+        COALESCE(SUM(i.quantity_on_hand), 0) AS totalQuantityOnHand,
+        COALESCE(SUM(i.quantity_available), 0) AS totalQuantityAvailable,
+        COALESCE(SUM(i.quantity_reserved), 0) AS totalQuantityReserved,
+        COUNT(DISTINCT i.part_id) AS uniquePartCount,
+        COUNT(DISTINCT p.sku) AS uniqueSkuCount
+      FROM inventory i
+      LEFT JOIN parts p ON i.part_id = p.part_id
+      LEFT JOIN suppliers s ON i.supplier_id = s.supplier_id
+      LEFT JOIN lots lt ON i.lot_id = lt.lot_id
+      WHERE i.company_id = ?
+        AND i.location_id = ?
+        AND i.is_active = 1
+        ${searchClause}
+    `;
+
+    const selectParams = [...baseParams, ...searchParams, limitValue, offsetValue];
+    const summaryParams = [...baseParams, ...searchParams];
+
+    const [items] = await pool.query(selectSql, selectParams);
+    const [[summaryRow = {}]] = await pool.query(summarySql, summaryParams);
+
+    return {
+      items,
+      total: Number(summaryRow.totalItems) || 0,
+      summary: {
+        totalQuantityOnHand: Number(summaryRow.totalQuantityOnHand) || 0,
+        totalQuantityAvailable: Number(summaryRow.totalQuantityAvailable) || 0,
+        totalQuantityReserved: Number(summaryRow.totalQuantityReserved) || 0,
+        uniquePartCount: Number(summaryRow.uniquePartCount) || 0,
+        uniqueSkuCount: Number(summaryRow.uniqueSkuCount) || 0
+      }
+    };
   }
 };

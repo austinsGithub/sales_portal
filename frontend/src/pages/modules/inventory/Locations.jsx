@@ -22,6 +22,84 @@ const INITIAL_FORM = {
 };
 
 const PAGE_SIZE = 10;
+const INVENTORY_PAGE_SIZE = 20;
+
+const numberFormatter = new Intl.NumberFormat('en-US');
+
+const defaultInventorySummary = {
+  totalQuantityOnHand: 0,
+  totalQuantityAvailable: 0,
+  totalQuantityReserved: 0,
+  uniquePartCount: 0,
+  uniqueSkuCount: 0
+};
+
+const formatNumberValue = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '0';
+  return numberFormatter.format(numeric);
+};
+
+const formatDateValue = (value) => {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '—';
+  }
+  return date.toLocaleDateString();
+};
+
+const getStatusTone = (status = '') => {
+  const normalized = status.toLowerCase();
+  if (normalized === 'expired') return 'danger';
+  if (normalized === 'expiring soon') return 'warning';
+  if (normalized === 'active') return 'success';
+  return 'neutral';
+};
+
+const DETAIL_TABS = [
+  { id: 'details', label: 'Details' },
+  { id: 'inventory', label: 'Inventory' }
+];
+
+const buildSummaryFromItems = (items = []) => {
+  const totals = {
+    totalQuantityOnHand: 0,
+    totalQuantityAvailable: 0,
+    totalQuantityReserved: 0
+  };
+
+  const uniqueSkus = new Set();
+  const uniqueParts = new Set();
+
+  items.forEach(item => {
+    totals.totalQuantityOnHand += Number(item.quantity_on_hand) || 0;
+    totals.totalQuantityAvailable += Number(item.quantity_available) || 0;
+    totals.totalQuantityReserved += Number(item.quantity_reserved) || 0;
+
+    if (item.sku) uniqueSkus.add(item.sku);
+    if (item.part_id) uniqueParts.add(item.part_id);
+  });
+
+  return {
+    totalQuantityOnHand: totals.totalQuantityOnHand,
+    totalQuantityAvailable: totals.totalQuantityAvailable,
+    totalQuantityReserved: totals.totalQuantityReserved,
+    uniqueSkuCount: uniqueSkus.size,
+    uniquePartCount: uniqueParts.size
+  };
+};
+
+function useDebouncedValue(value, delay = 350) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(timeout);
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 const LOCATION_TYPE_OPTIONS = [
   { value: '', label: 'Select a type' },
@@ -54,6 +132,31 @@ const Locations = () => {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [totalCount, setTotalCount] = useState(null);
+  const [inventorySearch, setInventorySearch] = useState('');
+  const [inventoryData, setInventoryData] = useState([]);
+  const [inventorySummary, setInventorySummary] = useState(null);
+  const [inventoryTotal, setInventoryTotal] = useState(0);
+  const [inventoryOffset, setInventoryOffset] = useState(0);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryError, setInventoryError] = useState(null);
+  const [activeDetailTab, setActiveDetailTab] = useState(DETAIL_TABS[0].id);
+
+  const selectedLocationId = selectedLocation?.location_id;
+  const debouncedInventorySearch = useDebouncedValue(inventorySearch, 400);
+
+  const applyInventoryResponse = useCallback((payload, { deriveSummaryFromItems = false } = {}) => {
+    const rawItems = payload?.items ?? payload?.data ?? payload?.rows ?? [];
+    const normalizedItems = Array.isArray(rawItems) ? rawItems : [];
+    const parsedTotal = Number(payload?.total ?? payload?.count);
+    const summary = deriveSummaryFromItems || !payload?.summary
+      ? buildSummaryFromItems(normalizedItems)
+      : { ...defaultInventorySummary, ...payload.summary };
+
+    setInventoryData(normalizedItems);
+    setInventorySummary(summary);
+    setInventoryTotal(Number.isFinite(parsedTotal) ? parsedTotal : normalizedItems.length);
+    setInventoryError(null);
+  }, []);
 
   const loadLocations = useCallback(async () => {
     try {
@@ -92,13 +195,79 @@ const Locations = () => {
     }
   }, [searchQuery, offset]);
 
+  const loadLocationInventory = useCallback(async () => {
+    if (!selectedLocationId) {
+      setInventoryData([]);
+      setInventorySummary(null);
+      setInventoryTotal(0);
+      setInventoryError(null);
+      setInventoryLoading(false);
+      return;
+    }
+
+    setInventoryLoading(true);
+    setInventoryError(null);
+
+    const sharedParams = {
+      q: debouncedInventorySearch || undefined,
+      limit: INVENTORY_PAGE_SIZE,
+      offset: inventoryOffset
+    };
+
+    try {
+      const response = await axios.get(
+        buildApiUrl(`/api/inventory/locations/${selectedLocationId}/inventory`),
+        { params: sharedParams }
+      );
+      applyInventoryResponse(response.data || {});
+    } catch (primaryError) {
+      console.error('Error fetching location inventory (enhanced route):', primaryError);
+
+      try {
+        const fallbackResponse = await axios.get(
+          buildApiUrl('/api/inventory/items'),
+          {
+            params: {
+              ...sharedParams,
+              locationId: selectedLocationId
+            }
+          }
+        );
+
+        applyInventoryResponse(fallbackResponse.data || {}, { deriveSummaryFromItems: true });
+      } catch (fallbackError) {
+        console.error('Fallback inventory fetch failed:', fallbackError);
+        setInventoryData([]);
+        setInventorySummary(null);
+        setInventoryTotal(0);
+        setInventoryError('Unable to load inventory for this location right now.');
+      }
+    } finally {
+      setInventoryLoading(false);
+    }
+  }, [selectedLocationId, debouncedInventorySearch, inventoryOffset, applyInventoryResponse]);
+
   useEffect(() => {
     loadLocations();
   }, [loadLocations]);
 
   useEffect(() => {
+    loadLocationInventory();
+  }, [loadLocationInventory]);
+
+  useEffect(() => {
     setOffset(0);
   }, [searchQuery]);
+
+  useEffect(() => {
+    setInventorySearch('');
+    setInventoryOffset(0);
+    setActiveDetailTab(DETAIL_TABS[0].id);
+  }, [selectedLocationId]);
+
+  useEffect(() => {
+    setInventoryOffset(0);
+  }, [debouncedInventorySearch]);
 
   useEffect(() => {
     const fetchLocationGroups = async () => {
@@ -148,8 +317,23 @@ const Locations = () => {
     }
   };
 
+  const nextInventoryPage = () => {
+    setInventoryOffset(prev => {
+      const next = prev + INVENTORY_PAGE_SIZE;
+      if (next >= inventoryTotal) {
+        return prev;
+      }
+      return next;
+    });
+  };
+
+  const prevInventoryPage = () => {
+    setInventoryOffset(prev => Math.max(0, prev - INVENTORY_PAGE_SIZE));
+  };
+
   const handleSelectLocation = (location) => {
     setSelectedLocation(location);
+    setActiveDetailTab(DETAIL_TABS[0].id);
     if (isMobile) {
       setShowMobileDetail(true);
     }
@@ -266,12 +450,169 @@ const Locations = () => {
     );
   };
 
+  const renderInventorySection = () => {
+    if (!selectedLocation) {
+      return null;
+    }
+
+    const summary = inventorySummary
+      ? { ...defaultInventorySummary, ...inventorySummary }
+      : defaultInventorySummary;
+
+    const totalPages = Math.max(Math.ceil((inventoryTotal || 0) / INVENTORY_PAGE_SIZE), 1);
+    const currentPage = Math.min(totalPages, Math.floor(inventoryOffset / INVENTORY_PAGE_SIZE) + 1);
+    const hasPrevInventory = inventoryOffset > 0;
+    const hasNextInventory = inventoryOffset + INVENTORY_PAGE_SIZE < inventoryTotal;
+
+    const summaryMetrics = [
+      { label: 'Available', value: formatNumberValue(summary.totalQuantityAvailable) },
+      { label: 'On Hand', value: formatNumberValue(summary.totalQuantityOnHand) },
+      { label: 'Reserved', value: formatNumberValue(summary.totalQuantityReserved) },
+      { label: 'Unique SKUs', value: formatNumberValue(summary.uniqueSkuCount) },
+      { label: 'Unique Parts', value: formatNumberValue(summary.uniquePartCount) }
+    ];
+
+    return (
+      <div className="location-inventory-section">
+        <div className="section-header">
+          <div>
+            <h3>Inventory at this location</h3>
+            <p className="section-subtitle">Search by SKU, supplier, lot or serial number.</p>
+          </div>
+          <div className="inventory-count-pill">
+            {inventoryLoading ? 'Loading...' : `${inventoryTotal} line${inventoryTotal === 1 ? '' : 's'}`}
+          </div>
+        </div>
+
+        <div className="inventory-toolbar">
+          <div className="inventory-search">
+            
+            <input
+              type="text"
+              placeholder="Search SKU, supplier, lot, serial..."
+              value={inventorySearch}
+              onChange={(event) => setInventorySearch(event.target.value)}
+            />
+          </div>
+
+          <div className="inventory-summary-grid">
+            {summaryMetrics.map(metric => (
+              <div className="inventory-summary-tile" key={metric.label}>
+                <p className="label">{metric.label}</p>
+                <p className="value">{metric.value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {inventoryError && (
+          <div className="error-banner inventory-error">
+            {inventoryError}
+          </div>
+        )}
+
+        <div className="inventory-table-wrapper">
+          {inventoryLoading ? (
+            <div className="loading-row">Loading inventory...</div>
+          ) : inventoryData.length === 0 ? (
+            <div className="detail-empty-state">
+              <p>No inventory lines match your filters.</p>
+            </div>
+          ) : (
+            <table className="inventory-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Available</th>
+                  <th>On Hand</th>
+                  <th>Reserved</th>
+                  <th>Supplier</th>
+                  <th>Lot / Expiration</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryData.map(item => (
+                  <tr key={item.inventory_id}>
+                    <td>
+                      <div className="inventory-item-cell">
+                        <span className="item-name">{item.product_name || 'Unnamed Item'}</span>
+                        <span className="item-meta">
+                          {item.sku ? `SKU ${item.sku}` : 'SKU N/A'}
+                          {item.category ? ` • ${item.category}` : ''}
+                        </span>
+                        {item.serial_number && (
+                          <span className="item-meta muted">SN: {item.serial_number}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td>{formatNumberValue(item.quantity_available)}</td>
+                    <td>{formatNumberValue(item.quantity_on_hand)}</td>
+                    <td>{formatNumberValue(item.quantity_reserved)}</td>
+                    <td>
+                      <div className="inventory-item-cell">
+                        <span>{item.supplier_name || '—'}</span>
+                        {item.received_date && (
+                          <span className="item-meta muted">
+                            Received {formatDateValue(item.received_date)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="inventory-item-cell">
+                        <span>{item.lot_number || '—'}</span>
+                        <span className="item-meta muted">
+                          {item.expiration_date
+                            ? `Exp ${formatDateValue(item.expiration_date)}`
+                            : 'No expiration'}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`inventory-status status-${getStatusTone(item.status)}`}>
+                        {item.status || '—'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="inventory-pagination">
+            <button
+              type="button"
+              onClick={prevInventoryPage}
+              className="pagination-btn"
+              disabled={!hasPrevInventory || inventoryLoading}
+            >
+              Prev
+            </button>
+            <span className="page-indicator">{`Page ${currentPage} of ${totalPages}`}</span>
+            <button
+              type="button"
+              onClick={nextInventoryPage}
+              className="pagination-btn"
+              disabled={!hasNextInventory || inventoryLoading}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="locations-layout">
       <section className="location-list-panel">
         <div className="list-panel-header">
           <h1>Locations</h1>
           <div className="search-bar">
+            <Search className="search-icon" size={16} aria-hidden="true" />
             <input
               type="text"
               placeholder="Search locations..."
@@ -351,7 +692,21 @@ const Locations = () => {
 
       <section className="detail-panel location-detail-panel">
         <div className="detail-card location-detail-content">
-          {renderLocationDetails(selectedLocation)}
+          <div className="detail-tabs">
+            {DETAIL_TABS.map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`detail-tab-btn ${activeDetailTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveDetailTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activeDetailTab === 'details' && renderLocationDetails(selectedLocation)}
+          {activeDetailTab === 'inventory' && renderInventorySection()}
         </div>
       </section>
 
@@ -478,7 +833,23 @@ const Locations = () => {
         onClose={() => setShowMobileDetail(false)}
         title="Location Details"
       >
-        {renderLocationDetails(selectedLocation)}
+        <>
+          <div className="detail-tabs mobile">
+            {DETAIL_TABS.map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`detail-tab-btn ${activeDetailTab === tab.id ? 'active' : ''}`}
+                onClick={() => setActiveDetailTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activeDetailTab === 'details' && renderLocationDetails(selectedLocation)}
+          {activeDetailTab === 'inventory' && renderInventorySection()}
+        </>
       </MobileLocationModal>
     </div>
   );

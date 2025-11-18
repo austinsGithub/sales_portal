@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { Menu, User, Settings, Bug, LogOut } from 'lucide-react';
 import { useAuth } from '../../shared/contexts/AuthContext.jsx';
 import './TopBar.css';
 
@@ -87,6 +87,7 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
               className="dropdown-item"
               onClick={() => setShowDropdown(false)}
             >
+              <User size={16} />
               <span>My Profile</span>
             </Link>
             {(user?.is_super_admin == 1 ||
@@ -97,6 +98,7 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
                 className="dropdown-item"
                 onClick={() => setShowDropdown(false)}
               >
+                <Settings size={16} />
                 <span>Admin Settings</span>
               </Link>
             )}
@@ -113,16 +115,18 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
               }}
               style={{ cursor: 'pointer' }}
             >
+              <Bug size={16} />
               <span>Show Auth Debug (local)</span>
             </div>
             <div className="dropdown-divider" />
             <button
-              className="dropdown-item"
+              className="dropdown-item dropdown-item-danger"
               onClick={(e) => {
                 e.stopPropagation();
                 handleLogout(e);
               }}
             >
+              <LogOut size={16} />
               <span>Logout</span>
             </button>
           </div>

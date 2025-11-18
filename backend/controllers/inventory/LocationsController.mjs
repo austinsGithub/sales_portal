@@ -62,5 +62,26 @@ export const ProcurementLocationsController = {
       console.error('Error deleting procurement location:', err);
       res.status(500).json({ message: 'Failed to delete procurement location' });
     }
+  },
+
+  async inventoryByLocation(req, res) {
+    try {
+      const company_id = getCompanyId(req);
+      const location_id = req.params.id;
+      const { q, limit, offset } = req.query;
+
+      const data = await ProcurementLocationsModel.getInventoryByLocation({
+        company_id,
+        location_id,
+        q,
+        limit: parseInt(limit) || undefined,
+        offset: parseInt(offset) || undefined
+      });
+
+      res.json(data);
+    } catch (err) {
+      console.error('Error fetching inventory for location:', err);
+      res.status(500).json({ message: 'Failed to load inventory for this location' });
+    }
   }
 };

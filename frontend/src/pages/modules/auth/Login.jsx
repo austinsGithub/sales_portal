@@ -96,19 +96,15 @@ function LoginPage() {
       <div className="login-grid">
         <div className="login-hero">
           <span className="login-hero__badge">Casetray.com</span>
-          <h4 className="login-hero__subtext">Unified revenue + inventory workspace</h4>
+          <h4 className="login-hero__subtext">One-stop sales + inventory </h4>
           <h1>
-            Secure inventory insight
-            <span>built for modern operations</span>
+            Manage your business in one place
+            <span></span>
           </h1>
-          <p>
-            Manage transfer orders, lot traceability, and approvals with a single connected workspace.
-            Stay audit-ready with live telemetry and role-based access.
-          </p>
+          <p>Track stock health, fulfillment, and performance from a single secure workspace.</p>
           <ul className="login-hero__perks">
-            <li>End-to-end visibility</li>
-            <li>Blueprint driven loadouts</li>
-            <li>Secure SSO authentication</li>
+            <li>Live stock health & fulfillment view</li>
+            <li>Forecasts tied directly to every order</li>
           </ul>
         </div>
 
@@ -122,8 +118,8 @@ function LoginPage() {
           </svg>
         </div>
 
-        <h2 className="login-card__title">Welcome back to Casetray</h2>
-        <p className="login-card__subtitle">Log in with your casetray.com credentials</p>
+        <h2 className="login-card__title">Welcome back to your Casetray portal</h2>
+        <p className="login-card__subtitle">Unlock analytics, inventory, and sales workflows</p>
 
         {error && <div className="error-message">{error}</div>}
 

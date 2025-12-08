@@ -1,3 +1,35 @@
+:root {
+  --workspace-canvas: #fefefe;
+  --workspace-pane: #ffffff;
+  --workspace-pane-strong: #ffffff;
+  --workspace-border: rgba(15, 19, 43, 0.06);
+  --workspace-border-strong: rgba(15, 19, 43, 0.12);
+  --workspace-shadow-soft: none;
+  --workspace-shadow-card: none;
+  --workspace-ink: #111322;
+  --workspace-muted: #6d7384;
+  --workspace-radius-lg: 24px;
+  --workspace-radius-md: 16px;
+  --content-max-width: 1440px;
+  --content-gutter: clamp(16px, 2vw, 28px);
+  --content-gutter-vertical: clamp(18px, 2vw, 32px);
+  --content-gutter-bottom: clamp(24px, 3vw, 48px);
+  --chrome-divider: rgba(15, 19, 43, 0.08);
+  --chrome-divider-strong: rgba(15, 19, 43, 0.12);
+  --topbar-height: 72px;
+  --topbar-offset: 0px;
+  --type-base: clamp(14px, 0.95vw, 16px);
+}
+
+body {
+  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--workspace-canvas);
+  color: var(--workspace-ink);
+  font-size: var(--type-base);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
 /* Main layout container */
 .app-container {
   display: flex;
@@ -14,9 +46,9 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--workspace-canvas);
   transition: margin-left 0.3s ease, padding-top 0.2s ease;
-  margin-left: var(--sidebar-width, 256px);
+  margin-left: 0;
   padding-top: calc(var(--topbar-height, 64px) + var(--topbar-offset, 0px));
 }
 
@@ -60,11 +92,6 @@
 }
 
 /* Topbar spacing variable fallback */
-:root {
-  --topbar-height: 64px;
-  --topbar-offset: 0px;
-}
-
 /* Prevent body scroll when mobile sidebar is open (class toggled in AppLayout) */
 .no-scroll {
   overflow: hidden !important;
@@ -76,21 +103,26 @@
   flex: 1 1 auto;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 1.75rem 2.25rem 2.75rem;
+  padding: var(--content-gutter-vertical) var(--content-gutter) var(--content-gutter-bottom);
+  background: #ffffff;
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .app-footer {
   flex-shrink: 0;
   padding: 1rem 2.25rem 1.5rem;
-  border-top: 1px solid #eceef5;
-  background: linear-gradient(180deg, #ffffff 0%, #f9fafc 100%);
+  border-top: 1px solid rgba(15, 19, 43, 0.06);
+  background: #ffffff;
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
   justify-content: space-between;
   align-items: center;
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--workspace-muted);
 }
 
 .footer-left,
@@ -103,7 +135,7 @@
 
 .footer-title {
   font-weight: 600;
-  color: #111827;
+  color: var(--workspace-ink);
 }
 
 .footer-divider {

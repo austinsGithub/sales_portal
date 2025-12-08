@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import './Suppliers.css';
 import SupplierAddress from './SupplierAddress.jsx';
+import SupplierCosts from './SupplierCosts.jsx';
 import useIsMobile from '../../../hooks/useIsMobile.js';
 import MobileSupplierModal from './SupplierModalMobile.jsx';
 import { useAuth } from '../../../shared/contexts/AuthContext.jsx';
@@ -72,7 +73,16 @@ function AddSupplierModal({ open, onClose, onCreated, authTokenStr }) {
           minimum_order_amount: Number(form.minimum_order_amount) || 0,
         }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let message = `HTTP ${res.status}`;
+        try {
+          const data = await res.json();
+          message = data?.error || data?.message || message;
+        } catch {
+          // fall back to generic message
+        }
+        throw new Error(message);
+      }
       const created = await res.json();
       onCreated(created);
       onClose();
@@ -425,7 +435,10 @@ export default function Suppliers() {
   const SupplierDetails = ({ s, onEdit }) => (
     <div className="supplier-detail-content">
       <div className="detail-header">
-        <h2>{s.supplier_name}</h2>
+        <h2>
+          {s.supplier_name}
+          {s.is_active && <span className="status-badge">Active</span>}
+        </h2>
         <button onClick={onEdit} className="edit-btn">Edit</button>
       </div>
 
@@ -443,9 +456,9 @@ export default function Suppliers() {
         <div className="detail-item"><label>Quality Rating</label><p>{s.quality_rating}</p></div>
         <div className="detail-item"><label>Preferred Vendor</label><p>{s.preferred_vendor ? 'Yes' : 'No'}</p></div>
         <div className="detail-item"><label>Active</label><p>{s.is_active ? 'Yes' : 'No'}</p></div>
-        <div className="detail-item"><label>Created At</label><p>{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</p></div>
-        <div className="detail-item col-span-2"><label>Certifications</label><p>{s.certifications || '—'}</p></div>
-        <div className="detail-item col-span-2"><label>Notes</label><p>{s.notes || '—'}</p></div>
+        <div className="detail-item"><label>Created At</label><p>{s.created_at ? new Date(s.created_at).toLocaleString() : '-'}</p></div>
+        <div className="detail-item col-span-2"><label>Certifications</label><p>{s.certifications || '-'}</p></div>
+        <div className="detail-item col-span-2"><label>Notes</label><p>{s.notes || '-'}</p></div>
       </div>
     </div>
   );
@@ -562,7 +575,7 @@ export default function Suppliers() {
         </div>
 
         <div style={{ marginTop: 12, opacity: 0.7 }}>
-          <small>Created at: {s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</small>
+          <small>Created at: {s.created_at ? new Date(s.created_at).toLocaleString() : '-'}</small>
         </div>
       </div>
     );
@@ -574,18 +587,19 @@ export default function Suppliers() {
       <div className="supplier-list-panel">
         <div className="list-panel-header">
           <h1>Suppliers</h1>
-          <div className="list-panel-actions">
+          <div className="list-controls">
+            <div className="search-bar">
+              <Search className="search-icon" size={16} />
+              <input
+                type="text"
+                placeholder="Search suppliers..."
+                value={typing}
+                onChange={(e) => setTyping(e.target.value)}
+              />
+            </div>
             <button className="filters-btn" onClick={() => setOpenFilters(true)}>Filters</button>
-            {includeInactive && <span className="filter-chip">Including deactivated</span>}
           </div>
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search suppliers..."
-              value={typing}
-              onChange={(e) => setTyping(e.target.value)}
-            />
-          </div>
+          {includeInactive && <span className="filter-chip">Including deactivated</span>}
         </div>
 
         
@@ -620,7 +634,7 @@ export default function Suppliers() {
             </button>
             <span className="page-indicator">
               {totalPages ? (`Page ${currentPage} of ${totalPages}`) : (`Page ${currentPage}`)}
-              {` • ${PAGE_SIZE} per page`}
+              {` - ${PAGE_SIZE} per page`}
             </span>
             <button
               className="pagination-btn"
@@ -653,6 +667,12 @@ export default function Suppliers() {
             >
               Address
             </button>
+            <button
+              className={`tab-btn ${activeTab === 'costs' ? 'active' : ''}` }
+              onClick={() => setActiveTab('costs')}
+            >
+              Supplier Costs
+            </button>
           </div>
 
           {selected && activeTab === 'general' && (
@@ -678,8 +698,14 @@ export default function Suppliers() {
                 country: selected.country,
                 phone: selected.phone,
               }}
-              isEditing={true}
               onUpdate={(addrPatch) => saveAddress(selected.supplier_id, addrPatch)}
+            />
+          )}
+
+          {selected && activeTab === 'costs' && (
+            <SupplierCosts
+              supplierId={selected.supplier_id}
+              authToken={token || getAuthToken()}
             />
           )}
         </MobileSupplierModal>
@@ -702,6 +728,12 @@ export default function Suppliers() {
                 >
                   Address
                 </button>
+                <button
+                  className={`tab-btn ${activeTab === 'costs' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('costs')}
+                >
+                  Supplier Costs
+                </button>
               </div>
 
               {activeTab === 'general' && (
@@ -723,16 +755,22 @@ export default function Suppliers() {
                     address_line2: selected.address_line2,
                     city: selected.city,
                     state: selected.state,
-                    postal_code: selected.postal_code,
-                    country: selected.country,
-                    phone: selected.phone,
-                  }}
-                  isEditing={true}
-                  onUpdate={(addrPatch) => saveAddress(selected.supplier_id, addrPatch)}
+                postal_code: selected.postal_code,
+                country: selected.country,
+                phone: selected.phone,
+              }}
+              onUpdate={(addrPatch) => saveAddress(selected.supplier_id, addrPatch)}
+            />
+          )}
+
+              {activeTab === 'costs' && (
+                <SupplierCosts
+                  supplierId={selected.supplier_id}
+                  authToken={token || getAuthToken()}
                 />
               )}
-            </>
-          )}
+        </>
+      )}
         </div>
       )}
 

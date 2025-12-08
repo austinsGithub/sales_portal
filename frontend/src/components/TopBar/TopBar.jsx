@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Menu, User, Settings, Bug, LogOut } from 'lucide-react';
 import { useAuth } from '../../shared/contexts/AuthContext.jsx';
@@ -8,12 +8,7 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
-  const brandName = user?.company_name || 'Traycase.com';
-  const brandSubtitle = user?.company?.tagline || 'Sales Portal';
-  const brandInitials = brandName
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .slice(0, 2)
-    .toUpperCase();
+  const profileRef = useRef(null);
 
   if (!user) return null;
 
@@ -29,6 +24,18 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
     }
   };
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   return (
     <header className={`top-bar ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="top-bar-left">
@@ -39,98 +46,99 @@ const TopBar = ({ onToggleSidebar, sidebarCollapsed }) => {
         >
           <Menu size={20} />
         </button>
-        
       </div>
 
       <div className="top-bar-right">
-        <div
-          className="user-profile"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowDropdown(!showDropdown);
-          }}
-        >
-          <div className="user-avatar-container">
-            <img
-              src={user?.avatar || '/vite.svg'}
-              alt="User Avatar"
-              className="user-avatar"
-              onError={(e) => {
-                const img = e.currentTarget;
-                if (img.dataset.errored) return;
-                img.dataset.errored = '1';
-                img.src =
-                  'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\" viewBox=\"0 0 16 16\"><rect width=\"16\" height=\"16\" rx=\"8\" fill=\"%23111\"/><text x=\"8\" y=\"11\" font-size=\"8\" fill=\"%23fff\" text-anchor=\"middle\">U</text></svg>';
-              }}
-            />
-          </div>
-
-          <div className="user-info">
-            <span className="user-email">{user.email || user.name || 'User'}</span>
-          </div>
-
-          <svg
-            className={`dropdown-chevron ${showDropdown ? 'open' : ''}`}
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
+        <div className="user-profile-wrapper" ref={profileRef}>
+          <div
+            className="user-profile"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDropdown(!showDropdown);
+            }}
           >
-            <polyline points="6 9 12 15 18 9"></polyline>
-          </svg>
-        </div>
+            <div className="user-avatar-container">
+              <img
+                src={user?.avatar || '/vite.svg'}
+                alt="User Avatar"
+                className="user-avatar"
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  if (img.dataset.errored) return;
+                  img.dataset.errored = '1';
+                  img.src =
+                    'data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"32\" height=\"32\" viewBox=\"0 0 16 16\"><rect width=\"16\" height=\"16\" rx=\"8\" fill=\"%23111\"/><text x=\"8\" y=\"11\" font-size=\"8\" fill=\"%23fff\" text-anchor=\"middle\">U</text></svg>';
+                }}
+              />
+            </div>
 
-        {showDropdown && (
-          <div className="dropdown-menu">
-            <Link
-              to="/account-settings"
-              className="dropdown-item"
-              onClick={() => setShowDropdown(false)}
+            <div className="user-info">
+              <span className="user-email">{user.email || user.name || 'User'}</span>
+            </div>
+
+            <svg
+              className={`dropdown-chevron ${showDropdown ? 'open' : ''}`}
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
             >
-              <User size={16} />
-              <span>My Profile</span>
-            </Link>
-            {(user?.is_super_admin == 1 ||
-              user.role === 'super_admin' ||
-              user.role === 'operations_admin') && (
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+
+          {showDropdown && (
+            <div className="dropdown-menu">
               <Link
-                to="/admin/settings"
+                to="/account-settings"
                 className="dropdown-item"
                 onClick={() => setShowDropdown(false)}
               >
-                <Settings size={16} />
-                <span>Admin Settings</span>
+                <User size={16} />
+                <span>My Profile</span>
               </Link>
-            )}
-            <div
-              className="dropdown-item"
-              onClick={(e) => {
-                e.stopPropagation();
-                console.log('Auth debug (local only):', {
-                  localStorageUser: localStorage.getItem('userData'),
-                  authToken: localStorage.getItem('auth_token'),
-                  inMemoryUser: user
-                });
-                setShowDropdown(false);
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              <Bug size={16} />
-              <span>Show Auth Debug (local)</span>
+              {(user?.is_super_admin == 1 ||
+                user.role === 'super_admin' ||
+                user.role === 'operations_admin') && (
+                <Link
+                  to="/admin/settings"
+                  className="dropdown-item"
+                  onClick={() => setShowDropdown(false)}
+                >
+                  <Settings size={16} />
+                  <span>Admin Settings</span>
+                </Link>
+              )}
+              <div
+                className="dropdown-item"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('Auth debug (local only):', {
+                    localStorageUser: localStorage.getItem('userData'),
+                    authToken: localStorage.getItem('auth_token'),
+                    inMemoryUser: user
+                  });
+                  setShowDropdown(false);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                <Bug size={16} />
+                <span>Show Auth Debug (local)</span>
+              </div>
+              <div className="dropdown-divider" />
+              <button
+                className="dropdown-item dropdown-item-danger"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLogout(e);
+                }}
+              >
+                <LogOut size={16} />
+                <span>Logout</span>
+              </button>
             </div>
-            <div className="dropdown-divider" />
-            <button
-              className="dropdown-item dropdown-item-danger"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLogout(e);
-              }}
-            >
-              <LogOut size={16} />
-              <span>Logout</span>
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );

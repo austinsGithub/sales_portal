@@ -19,12 +19,14 @@ import {
 import {
   Inventory,
   Products,
+  ProductCategories,
   Parts,
   ContainerLoadouts,
   ContainersBlueprint,
   Locations,
   LocationGroups,
-  TransferOrders
+  TransferOrders,
+  Bins
 } from './pages/modules/inventory';
 
 // Sales Module
@@ -37,6 +39,7 @@ import {
 
 import './css/global/App.css';
 import './css/global/Layout.css';
+import './css/global/ListPanel.css';
 import './css/global/loading.css';
 import './css/global/DetailPanels.css';
 
@@ -180,7 +183,11 @@ const AppContent = () => {
         )}
 
         <div className={mainContentClasses}>
-          <TopBar onLogout={handleLogout} onToggleSidebar={handleToggleSidebar} />
+          <TopBar
+            onLogout={handleLogout}
+            onToggleSidebar={handleToggleSidebar}
+            sidebarCollapsed={!isMobile && isCollapsed}
+          />
 
           <div className="content-scrollable">
             <Outlet />
@@ -281,6 +288,11 @@ const AppContent = () => {
               <Products />
             </ProtectedRoute>
           } />
+          <Route path="inventory/product-categories" element={
+            <ProtectedRoute requiredPermissions={['inventory.products.view']}>
+              <ProductCategories />
+            </ProtectedRoute>
+          } />
           <Route path="inventory/parts" element={
             <ProtectedRoute requiredPermissions={['inventory.parts.view']}>
               <Parts />
@@ -304,6 +316,11 @@ const AppContent = () => {
           <Route path="inventory/location-groups" element={
             <ProtectedRoute requiredPermissions={['inventory.locations.view']}>
               <LocationGroups />
+            </ProtectedRoute>
+          } />
+          <Route path="inventory/bins" element={
+            <ProtectedRoute requiredPermissions={['inventory.bins.view', 'inventory.inventory.view']}>
+              <Bins />
             </ProtectedRoute>
           } />
           <Route path="inventory/transfer-orders" element={

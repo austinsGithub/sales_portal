@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { Info } from 'lucide-react';
 import './Inventory.css';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -34,6 +35,21 @@ const getStatusClass = (status) => {
   if (status === 'Expired') return 'status-badge-expired';
   if (status === 'Expiring Soon') return 'status-badge-hold';
   return 'status-badge-active';
+};
+
+const Tooltip = ({ text, children }) => {
+  const [show, setShow] = useState(false);
+
+  return (
+    <span
+      className="tooltip-wrapper"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      {children}
+      {show && <span className="tooltip-content">{text}</span>}
+    </span>
+  );
 };
 
 export default function InventorySearch({ authToken }) {
@@ -172,6 +188,15 @@ export default function InventorySearch({ authToken }) {
   useEffect(() => {
     loadInventory();
   }, [loadInventory]);
+
+  const filteredInventory = useMemo(() => {
+    return inventory.filter((item) => {
+      const onHand = Number(item?.quantity_on_hand ?? item?.quantity ?? 0);
+      const available = Number(item?.quantity_available ?? 0);
+      const reserved = Number(item?.quantity_reserved ?? 0);
+      return onHand > 0 || available > 0 || reserved > 0;
+    });
+  }, [inventory]);
 
   const handleExport = useCallback(async () => {
     if (!effectiveToken) return;
@@ -321,8 +346,9 @@ export default function InventorySearch({ authToken }) {
   };
 
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const resultsStart = inventory.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0;
-  const resultsEnd = inventory.length > 0 ? Math.min(currentPage * itemsPerPage, totalItems) : 0;
+  const filteredTotal = filteredInventory.length;
+  const resultsStart = filteredTotal > 0 ? 1 : 0;
+  const resultsEnd = filteredTotal;
   const lastUpdatedLabel = lastUpdated
     ? lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : null;
@@ -501,7 +527,7 @@ export default function InventorySearch({ authToken }) {
           Showing {resultsStart} to {resultsEnd} of {totalItems} items
         </p>
         <div className="results-meta">
-          {loading && inventory.length > 0 && (
+          {loading && filteredInventory.length > 0 && (
             <span className="loading-inline">Refreshing…</span>
           )}
           {lastUpdatedLabel && (
@@ -517,7 +543,7 @@ export default function InventorySearch({ authToken }) {
             <h3>Error Loading Inventory</h3>
             <p>{error}</p>
           </div>
-        ) : inventory.length === 0 ? (
+        ) : filteredInventory.length === 0 ? (
           <div className="empty-state">
             <h3>No Inventory Found</h3>
             <p>Try adjusting your filters or search terms.</p>
@@ -533,9 +559,30 @@ export default function InventorySearch({ authToken }) {
                   <th>Lot #</th>
                   <th>Location</th>
                   <th>Warehouse / Group</th>
-                  <th className="align-right">On Hand</th>
-                  <th className="align-right">Available</th>
-                  <th className="align-right">Reserved</th>
+                  <th className="align-right">
+                    <span className="th-with-tooltip">
+                      On Hand
+                      <Tooltip text="Total physical inventory quantity at this location">
+                        <Info size={14} className="info-icon" />
+                      </Tooltip>
+                    </span>
+                  </th>
+                  <th className="align-right">
+                    <span className="th-with-tooltip">
+                      Available
+                      <Tooltip text="Quantity available for new orders (On Hand - Reserved)">
+                        <Info size={14} className="info-icon" />
+                      </Tooltip>
+                    </span>
+                  </th>
+                  <th className="align-right">
+                    <span className="th-with-tooltip">
+                      Reserved
+                      <Tooltip text="Quantity allocated to existing orders or transfers">
+                        <Info size={14} className="info-icon" />
+                      </Tooltip>
+                    </span>
+                  </th>
                   <th>Serial #</th>
                   <th>Received</th>
                   <th>Mfg Date</th>
@@ -544,7 +591,7 @@ export default function InventorySearch({ authToken }) {
                 </tr>
               </thead>
               <tbody>
-                {inventory.map((item) => {
+                {filteredInventory.map((item) => {
                   const expirationDate = item.expiration_date;
                   const status = resolveStatus(item);
                   const expired = status === 'Expired';

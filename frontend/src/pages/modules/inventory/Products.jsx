@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Plus, Search } from 'lucide-react';
 import './Products.css';
 import useIsMobile from '../../../hooks/useIsMobile.js';
@@ -8,6 +8,7 @@ import ListItem from '../../../components/ListItem.jsx';
 
 const PAGE_SIZE = 10;
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/inventory/products`;
+const CATEGORY_API_BASE = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/api/inventory/product-categories`;
 
 // Helper function to get auth token
 const getAuthToken = () => {
@@ -246,32 +247,45 @@ function AdvancedSearchModal({
   onApply,
 }) {
   if (!open) return null;
+
+  const handleChange = (field) => (e) => {
+    const value = e.target.value;
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onApply();
+  };
+
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="modal adv-modal" role="dialog" aria-modal="true" aria-labelledby="adv-search-title" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 id="adv-search-title">Advanced Search</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+    <div className="filter-modal-backdrop" role="presentation" onClick={onClose}>
+      <div className="filter-modal" role="dialog" aria-modal="true" aria-labelledby="product-adv-search" onClick={(e) => e.stopPropagation()}>
+        <div className="filter-modal__header">
+          <h3 id="product-adv-search">Advanced Search</h3>
+          <button type="button" className="filter-modal__close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <div className="modal-body adv-grid">
-          <label>Product Category
-            <input value={filters.product_category} onChange={(e) => setFilters(f => ({ ...f, product_category: e.target.value }))} />
-          </label>
-          <label>Min Price
-            <input type="number" step="0.01" min="0" value={filters.min_base_price} onChange={(e) => setFilters(f => ({ ...f, min_base_price: e.target.value }))} />
-          </label>
-          <label>Max Price
-            <input type="number" step="0.01" min="0" value={filters.max_base_price} onChange={(e) => setFilters(f => ({ ...f, max_base_price: e.target.value }))} />
-          </label>
-          <label className="adv-inline">
+        <form className="filter-modal__body" onSubmit={handleSubmit}>
+          <div className="filter-modal__grid">
+            <label className="filter-field">Product Category
+              <input value={filters.product_category} onChange={handleChange('product_category')} />
+            </label>
+            <label className="filter-field">Min Price
+              <input type="number" step="0.01" min="0" value={filters.min_base_price} onChange={handleChange('min_base_price')} />
+            </label>
+            <label className="filter-field">Max Price
+              <input type="number" step="0.01" min="0" value={filters.max_base_price} onChange={handleChange('max_base_price')} />
+            </label>
+          </div>
+          <label className="filter-checkbox">
             <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
             Show deactivated products
           </label>
-        </div>
-        <div className="modal-actions adv-actions">
-          <button className="cancel-btn" onClick={onClear}>Clear</button>
-          <button className="update-btn" onClick={onApply}>Apply</button>
-        </div>
+          <div className="filter-modal__actions">
+            <button type="button" className="filter-btn ghost" onClick={onClear}>Clear</button>
+            <button type="submit" className="filter-btn primary">Apply</button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -303,6 +317,7 @@ export default function Products() {
     min_base_price: '',
     max_base_price: '',
   });
+  const [productCategoriesMap, setProductCategoriesMap] = useState({});
 
   const abortRef = useRef(null);
 
@@ -310,6 +325,43 @@ export default function Products() {
     () => products.find(p => p.product_id === selectedId) || null,
     [products, selectedId]
   );
+
+  const ensureProductCategories = useCallback(async (productId) => {
+    if (!productId) return;
+    setProductCategoriesMap((prev) => {
+      const current = prev[productId];
+      if (current?.loading || current?.loaded) return prev;
+      return { ...prev, [productId]: { items: [], loading: true, error: '' } };
+    });
+
+    try {
+      const authToken = token || getAuthToken();
+      const res = await fetch(`${CATEGORY_API_BASE}/by-product/${productId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rows = await res.json();
+      setProductCategoriesMap((prev) => ({
+        ...prev,
+        [productId]: { items: rows, loading: false, loaded: true, error: '' }
+      }));
+    } catch (e) {
+      console.error('Failed to load categories for product', productId, e);
+      setProductCategoriesMap((prev) => ({
+        ...prev,
+        [productId]: { items: [], loading: false, loaded: false, error: String(e.message || e) }
+      }));
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (selectedId) {
+      ensureProductCategories(selectedId);
+    }
+  }, [selectedId, ensureProductCategories]);
 
   // Fetch parts list for displaying part information
   useEffect(() => {
@@ -386,6 +438,7 @@ export default function Products() {
         const rows = await res.json();
         setProducts(rows);
         setHasMore(rows.length === PAGE_SIZE);
+        rows.forEach((row) => ensureProductCategories(row.product_id));
 
         let selectionCleared = false;
         setSelectedId(prev => {
@@ -411,7 +464,7 @@ export default function Products() {
         abortRef.current.abort();
       }
     };
-  }, [offset, q, includeInactive, filters, token]);
+  }, [offset, q, includeInactive, filters, token, ensureProductCategories]);
 
   // pagination helpers
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
@@ -472,19 +525,20 @@ export default function Products() {
   };
 
   /* ---------------------------- Subcomponents ---------------------------- */
-  const ProductDetails = ({ p, onEdit, parts = [], loadingParts }) => {
+  const ProductDetails = ({ p, onEdit, parts = [], loadingParts, categoriesState }) => {
     const associatedPart = p.part_id ? parts.find(part => part.part_id === p.part_id) : null;
+    const categoryItems = categoriesState?.items || [];
+    const categoryNames = categoryItems.map((c) => c.category_name).filter(Boolean);
     
     return (
       <div className="product-detail-content">
         <div className="detail-header">
-          <h2>{p.product_name || 'Unnamed Product'}</h2>
-          <button onClick={onEdit} className="edit-btn">
-            Edit
-          </button>
+          <div className="detail-title-block">
+            <h2>{p.product_name || 'Unnamed Product'}</h2>
+            {p.description && <p className="description">{p.description}</p>}
+          </div>
+          <button onClick={onEdit} className="edit-btn">Edit</button>
         </div>
-        
-        {p.description && <p className="description">{p.description}</p>}
         
         <div className="detail-grid">
           <div className="detail-item">
@@ -501,7 +555,11 @@ export default function Products() {
           </div>
           <div className="detail-item">
             <label>Product Category</label>
-            <p>{p.product_category || 'N/A'}</p>
+            {categoriesState?.loading && <p>Loading categories…</p>}
+            {categoriesState?.error && <p className="text-gray-500">Error loading categories: {categoriesState.error}</p>}
+            {!categoriesState?.loading && !categoriesState?.error && (
+              <p>{categoryNames.length ? categoryNames.join(', ') : (p.product_category || 'Unassigned')}</p>
+            )}
           </div>
           <div className="detail-item">
             <label>Associated Part</label>
@@ -540,7 +598,7 @@ export default function Products() {
     );
   };
 
-  const ProductForm = ({ p, onCancel, onSave }) => {
+  const ProductForm = ({ p, onCancel, onSave, categoriesState }) => {
     const [form, setForm] = useState({
       company_id: p.company_id || '',
       part_id: p.part_id ? String(p.part_id) : '',
@@ -577,6 +635,11 @@ export default function Products() {
       fetchParts();
     }, [token]);
 
+    const categoryNames = (categoriesState?.items || []).map((c) => c.category_name).filter(Boolean);
+    const displayCategory = categoryNames.length
+      ? categoryNames.join(', ')
+      : (form.product_category || 'Not assigned');
+
     const change = (e) => {
       const { name, value, type, checked } = e.target;
       setForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
@@ -601,7 +664,18 @@ export default function Products() {
           </div>
           <div className="form-field">
             <label>Product Category</label>
-            <input name="product_category" value={form.product_category} onChange={change} />
+            <input
+              name="product_category"
+              value={displayCategory}
+              onChange={change}
+              disabled
+              placeholder="Enter category"
+            />
+            <p className="field-hint">
+              {categoryNames.length
+                ? `Categories are assigned under the Product Category tab: ${categoryNames.join(', ')}.`
+                : 'Not assigned. Manage categories under the Product Category tab.'}
+            </p>
           </div>
           <div className="form-field col-span-2">
             <label>Associated Part</label>
@@ -644,9 +718,16 @@ export default function Products() {
                 public_sku: form.public_sku || null,
                 base_price: Number(form.base_price) || 0,
                 description: form.description || null,
-                product_category: form.product_category || null,
                 is_active: form.is_active ? 1 : 0,
               };
+              
+              // If categories are managed via the Product Category tab (always in this form),
+              // avoid overwriting the column; keep server value as-is.
+              if (categoryNames.length) {
+                delete updateData.product_category;
+              } else {
+                updateData.product_category = form.product_category || null;
+              }
               
               Object.keys(updateData).forEach(key => {
                 if (updateData[key] === '') {
@@ -673,16 +754,12 @@ export default function Products() {
   /* --------------------------------- UI --------------------------------- */
   return (
     <div className="products-layout">
-      <div className="part-list-panel">
-        <div className="list-panel-header">
+      <section className="product-list-panel list-panel">
+        <div className="list-panel-header product-list-header">
           <h2>Products</h2>
           <div className="list-controls">
-            <div className="list-panel-actions">
-              <button className="filters-btn" onClick={() => setOpenFilters(true)}>Filters</button>
-              {includeInactive && <span className="filter-chip">Including deactivated</span>}
-            </div>
             <div className="search-bar">
-
+              <Search size={16} className="search-icon" aria-hidden="true" />
               <input
                 type="text"
                 placeholder="Search products..."
@@ -690,21 +767,27 @@ export default function Products() {
                 onChange={(e) => setTyping(e.target.value)}
               />
             </div>
+            <button className="filters-btn" onClick={() => setOpenFilters(true)}>Filters</button>
+            {includeInactive && <span className="filter-chip">Including deactivated</span>}
           </div>
         </div>
 
         {err && <div className="error-banner">Error: {err}</div>}
 
-        <div className="part-list">
-          {products.map(p => (
-            <ListItem
-              key={p.product_id}
-              title={p.product_name}
-              details={[p.public_sku, p.product_category]}
-              selected={selectedId === p.product_id}
-              onClick={() => { setSelectedId(p.product_id); setIsEditing(false); }}
-            />
-          ))}
+        <div className="product-list list-body">
+          {products.map(p => {
+            const categories = (productCategoriesMap[p.product_id]?.items || []).map((c) => c.category_name).filter(Boolean);
+            const categoryLabel = categories.length ? categories.join(', ') : (p.product_category || null);
+            return (
+              <ListItem
+                key={p.product_id}
+                title={p.product_name}
+                details={[p.public_sku, categoryLabel].filter(Boolean)}
+                selected={selectedId === p.product_id}
+                onClick={() => { setSelectedId(p.product_id); setIsEditing(false); }}
+              />
+            );
+          })}
           {loading && <div className="loading-row">Loading...</div>}
         </div>
 
@@ -735,7 +818,7 @@ export default function Products() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
       {isMobile ? (
         <MobileProductModal
@@ -749,6 +832,7 @@ export default function Products() {
                 p={selected}
                 onCancel={() => setIsEditing(false)}
                 onSave={(patch) => saveProduct(selected.product_id, patch)}
+                categoriesState={productCategoriesMap[selected.product_id]}
               />
             ) : (
               <ProductDetails 
@@ -756,20 +840,24 @@ export default function Products() {
                 onEdit={() => setIsEditing(true)}
                 parts={parts}
                 loadingParts={loadingParts}
+                categoriesState={productCategoriesMap[selected.product_id]}
               />
             )
           )}
         </MobileProductModal>
       ) : (
-        <div className="product-detail-panel">
+        <section className="product-detail-panel detail-panel">
           {!selected ? (
-            <p>Select a product to see details.</p>
+            <div className="detail-empty-state product-empty-state">
+              <p>Select a product to see details.</p>
+            </div>
           ) : (
             isEditing ? (
               <ProductForm
                 p={selected}
                 onCancel={() => setIsEditing(false)}
                 onSave={(patch) => saveProduct(selected.product_id, patch)}
+                categoriesState={productCategoriesMap[selected.product_id]}
               />
             ) : (
               <ProductDetails 
@@ -777,10 +865,11 @@ export default function Products() {
                 onEdit={() => setIsEditing(true)}
                 parts={parts}
                 loadingParts={loadingParts}
+                categoriesState={productCategoriesMap[selected.product_id]}
               />
             )
           )}
-        </div>
+        </section>
       )}
 
       <AdvancedSearchModal

@@ -59,13 +59,19 @@ export default function SupplierAddress({
   if (!isEditing) {
     return (
       <div className={`supplier-address ${className}`}>
-        <div>{addr.address_line1}</div>
-        {addr.address_line2 && <div>{addr.address_line2}</div>}
-        <div>{[addr.city, addr.state, addr.postal_code].filter(Boolean).join(', ')}</div>
-        <div>{addr.country}</div>
-        {addr.phone && <div>📞 {addr.phone}</div>}
+        <div className="address-card">
+          <div className="address-line">{addr.address_line1 || 'No address on file'}</div>
+          {addr.address_line2 && <div className="address-line">{addr.address_line2}</div>}
+          {(addr.city || addr.state || addr.postal_code) && (
+            <div className="address-meta">
+              {[addr.city, addr.state, addr.postal_code].filter(Boolean).join(', ')}
+            </div>
+          )}
+          {addr.country && <div className="address-country">{addr.country}</div>}
+          {addr.phone && <div className="address-phone">☎ {addr.phone}</div>}
+        </div>
         {onUpdate && (
-          <button onClick={() => setIsEditing(true)} aria-label="Edit address">
+          <button className="edit-address-btn" onClick={() => setIsEditing(true)} aria-label="Edit address">
             Edit Address
           </button>
         )}

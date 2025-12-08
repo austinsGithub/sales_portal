@@ -7,7 +7,8 @@ import {
   Package,
   Search,
   Layers,
-  ChevronRight
+  ChevronRight,
+  X
 } from 'lucide-react';
 import CreateTransferOrder from './CreateTransferOrder.jsx';
 import TransferOrderDetails from './TransferOrderDetails.jsx';
@@ -49,27 +50,49 @@ const TransferOrders = () => {
   const [assigningOrder, setAssigningOrder] = useState(null);
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalOrders, setTotalOrders] = useState(0);
 
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
+      const offset = (currentPage - 1) * pageSize;
       const { data } = await axios.get(`${API_BASE}/api/inventory/transfer-orders`, {
-        params: statusFilter ? { status: statusFilter } : undefined
+        params: {
+          ...(statusFilter ? { status: statusFilter } : {}),
+          limit: pageSize,
+          offset: offset
+        }
       });
-      setOrders(Array.isArray(data) ? data : []);
+
+      // Handle both old format (array) and new format (object with data and pagination)
+      if (Array.isArray(data)) {
+        setOrders(data);
+        setTotalOrders(data.length);
+      } else {
+        setOrders(Array.isArray(data.data) ? data.data : []);
+        setTotalOrders(data.pagination?.total || 0);
+      }
       setError('');
     } catch (err) {
       console.error('Failed to load transfer orders', err);
       setOrders([]);
+      setTotalOrders(0);
       setError('Unable to load transfer orders');
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, currentPage, pageSize]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
 
   useEffect(() => {
     if (!isDetailOpen) return;
@@ -203,7 +226,7 @@ const TransferOrders = () => {
         {loading ? (
           <div className="orders-placeholder">
             <div className="spinner" />
-            <p>Loading transfer orders…</p>
+            <p>Loading transfer orders...</p>
           </div>
         ) : listIsEmpty ? (
           <div className="orders-placeholder">
@@ -221,7 +244,9 @@ const TransferOrders = () => {
             )}
           </div>
         ) : (
-          <table className="orders-table">
+          <>
+            <div className="orders-table-wrapper">
+              <table className="orders-table">
             <thead>
               <tr>
                 <th>Transfer Order</th>
@@ -288,6 +313,18 @@ const TransferOrders = () => {
               ))}
             </tbody>
           </table>
+            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalItems={totalOrders}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+            />
+          </>
         )}
       </div>
       {showCreateModal && (
@@ -309,6 +346,14 @@ const TransferOrders = () => {
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              className="mobile-details-close"
+              type="button"
+              aria-label="Close details"
+              onClick={closeDetails}
+            >
+              <X size={18} />
+            </button>
             <TransferOrderDetails
               orderId={selectedOrderId}
               refreshToken={detailRefreshToken}
@@ -335,12 +380,105 @@ const TransferOrders = () => {
   );
 };
 
+const Pagination = ({ currentPage, totalItems, pageSize, onPageChange, onPageSizeChange }) => {
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 7;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 4) {
+        for (let i = 1; i <= 5; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 3) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+
+    return pages;
+  };
+
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endItem = Math.min(currentPage * pageSize, totalItems);
+
+  return (
+    <div className="orders-pagination">
+      <div className="pagination-info">
+        Showing {startItem} to {endItem} of {totalItems} orders
+      </div>
+
+      <div className="pagination-controls">
+        <button
+          className="pagination-button"
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          aria-label="Previous page"
+        >
+          Previous
+        </button>
+
+        {getPageNumbers().map((page, index) => (
+          page === '...' ? (
+            <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
+          ) : (
+            <button
+              key={page}
+              className={`pagination-button ${currentPage === page ? 'active' : ''}`}
+              onClick={() => onPageChange(page)}
+            >
+              {page}
+            </button>
+          )
+        ))}
+
+        <button
+          className="pagination-button"
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || totalPages === 0}
+          aria-label="Next page"
+        >
+          Next
+        </button>
+      </div>
+
+      <div className="pagination-page-size">
+        <label htmlFor="page-size">Per page:</label>
+        <select
+          id="page-size"
+          value={pageSize}
+          onChange={(e) => onPageSizeChange(Number(e.target.value))}
+        >
+          <option value={10}>10</option>
+          <option value={25}>25</option>
+          <option value={50}>50</option>
+          <option value={100}>100</option>
+        </select>
+      </div>
+    </div>
+  );
+};
+
 export default TransferOrders;
 
 const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
   const [loadouts, setLoadouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [assigningId, setAssigningId] = useState(null);
 
@@ -355,7 +493,7 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
       try {
         setLoading(true);
         const { data } = await axios.get(
-          `${API_BASE}/api/inventory/container-loadouts/search`,
+          `${API_BASE}/api/inventory/container_loadouts/search`,
           {
             params: {
               limit: 25,
@@ -393,15 +531,41 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
 
   const handleAssign = async (loadoutId) => {
     try {
+      setError('');
+      setSuccess('');
       setAssigningId(loadoutId);
+      const parsedId = Number(loadoutId);
+      if (!parsedId || Number.isNaN(parsedId)) {
+        setError('Invalid loadout id');
+        setAssigningId(null);
+        return;
+      }
       await axios.post(
         `${API_BASE}/api/inventory/transfer-orders/${order.transfer_order_id}/assign-loadout`,
-        { loadout_id: loadoutId }
+        {
+          loadout_id: parsedId,
+          blueprint_id: order?.blueprint_id,
+          from_location_id: order?.from_location_id
+        }
       );
-      if (onAssigned) onAssigned();
+      setSuccess('Loadout assigned');
+      // brief delay so user sees confirmation
+      setTimeout(() => {
+        if (onAssigned) onAssigned();
+        if (onClose) onClose();
+      }, 200);
     } catch (err) {
       console.error('Failed to assign loadout', err);
-      alert(err.response?.data?.error || 'Failed to assign loadout');
+      const apiMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        (typeof err.response?.data === 'string' ? err.response.data : '') ||
+        err.message ||
+        'Failed to assign loadout';
+      setError(typeof apiMessage === 'string' ? apiMessage : 'Failed to assign loadout');
+      if (typeof apiMessage === 'string' && apiMessage) {
+        alert(`Assign failed: ${apiMessage}`);
+      }
     } finally {
       setAssigningId(null);
     }
@@ -443,6 +607,7 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
             </div>
 
             {error && <div className="inline-alert error compact">{error}</div>}
+            {success && <div className="inline-alert success compact">{success}</div>}
 
             {loading ? (
               <div className="assign-loadout-loading">

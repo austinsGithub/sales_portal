@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { useAuth } from '../../../shared/contexts/AuthContext.jsx';
 import useIsMobile from '../../../hooks/useIsMobile.js';
 import './ContainersBlueprint.css';
@@ -245,7 +245,7 @@ export default function ContainerBlueprints() {
 
   /* ---------------------------- Subcomponents ---------------------------- */
   const BlueprintDetails = ({ blueprint, onEdit }) => (
-    <div className="part-detail-content">
+    <div className="blueprint-detail-card">
       <div className="detail-header">
         <h2>{blueprint.blueprint_name || 'Unnamed Blueprint'}</h2>
         <button onClick={onEdit} className="edit-btn">Edit</button>
@@ -289,15 +289,15 @@ export default function ContainerBlueprints() {
     };
 
     return (
-      <div className="part-detail-content">
+      <div className="blueprint-detail-card">
         <h2>Edit Blueprint</h2>
 
-        <div className="form-grid">
-          <div className="form-field">
+        <div className="blueprint-form-grid">
+          <div className="blueprint-form-field">
             <label>Blueprint Name</label>
             <input name="blueprint_name" value={form.blueprint_name} onChange={change} />
           </div>
-          <div className="form-field">
+          <div className="blueprint-form-field">
             <label>Serial Number Prefix</label>
             <input 
               name="serial_number_prefix" 
@@ -306,22 +306,22 @@ export default function ContainerBlueprints() {
               placeholder="Enter prefix"
             />
           </div>
-          <div className="form-field col-span-2">
+          <div className="blueprint-form-field col-span-2">
             <label>Description</label>
             <textarea name="blueprint_description" rows={4} value={form.blueprint_description} onChange={change} />
           </div>
         </div>
 
-        <div className="form-checkbox">
+        <label className="blueprint-checkbox">
           <input id="is_active" name="is_active" type="checkbox"
                  checked={form.is_active} onChange={change} />
-          <label htmlFor="is_active">Active</label>
-        </div>
+          <span>Active</span>
+        </label>
 
-        <div className="form-actions">
-          <button className="cancel-btn" onClick={onCancel}>Cancel</button>
+        <div className="blueprint-form-actions">
+          <button className="blueprint-btn ghost" onClick={onCancel}>Cancel</button>
           <button 
-            className="update-btn"
+            className="blueprint-btn primary"
             onClick={() => {
               const updateData = {
                 blueprint_name: form.blueprint_name,
@@ -509,7 +509,7 @@ This item might be in use by existing containers. Please check and try again.`);
     if (loading) return <div>Loading items...</div>;
 
     return (
-      <div className="part-detail-content">
+      <section className="part-detail-content">
         <div className="detail-header">
           <h2>Blueprint Items</h2>
           <button className="edit-btn" onClick={() => setAdding(true)}>
@@ -518,10 +518,10 @@ This item might be in use by existing containers. Please check and try again.`);
         </div>
 
         {adding && (
-          <div style={{ marginBottom: '1.5rem', padding: '1rem', border: '1px solid #e5e7eb', borderRadius: '0.5rem' }}>
-            <h3 style={{ marginBottom: '1rem' }}>Add Product to Blueprint</h3>
-            <div className="form-grid">
-              <div className="form-field">
+          <div className="blueprint-add-item-card">
+            <h3>Add Product to Blueprint</h3>
+            <div className="blueprint-form-grid">
+              <div className="blueprint-form-field">
                 <label>Product</label>
                 <select 
                   value={newItem.product_id} 
@@ -535,7 +535,7 @@ This item might be in use by existing containers. Please check and try again.`);
                   ))}
                 </select>
               </div>
-              <div className="form-field">
+              <div className="blueprint-form-field">
                 <label>Minimum Quantity (0-{newItem.maximum_quantity})</label>
                 <input 
                   type="number" 
@@ -547,7 +547,7 @@ This item might be in use by existing containers. Please check and try again.`);
                   className={newItem.minimum_quantity > newItem.maximum_quantity ? 'error' : ''}
                 />
               </div>
-              <div className="form-field">
+              <div className="blueprint-form-field">
                 <label>Maximum Quantity ({newItem.minimum_quantity}+)</label>
                 <input 
                   type="number" 
@@ -558,7 +558,7 @@ This item might be in use by existing containers. Please check and try again.`);
                   className={newItem.maximum_quantity < newItem.minimum_quantity ? 'error' : ''}
                 />
               </div>
-              <div className="form-field">
+              <div className="blueprint-form-field">
                 <label>Default Quantity ({newItem.minimum_quantity}-{newItem.maximum_quantity})</label>
                 <input 
                   type="number" 
@@ -569,7 +569,7 @@ This item might be in use by existing containers. Please check and try again.`);
                   placeholder="Default quantity"
                 />
               </div>
-              <div className="form-field col-span-2">
+              <div className="blueprint-form-field col-span-2">
                 <label>Usage Notes</label>
                 <textarea 
                   rows={2}
@@ -578,25 +578,25 @@ This item might be in use by existing containers. Please check and try again.`);
                 />
               </div>
             </div>
-            <div className="form-actions">
-              <button className="cancel-btn" onClick={() => setAdding(false)}>Cancel</button>
-              <button className="update-btn" onClick={addItem}>Add Item</button>
+            <div className="blueprint-form-actions">
+              <button className="blueprint-btn ghost" onClick={() => setAdding(false)}>Cancel</button>
+              <button className="blueprint-btn primary" onClick={addItem}>Add Item</button>
             </div>
           </div>
         )}
 
         {items.length === 0 ? (
-          <div className="empty-state">
+          <div className="blueprint-empty-state">
             <p>No products assigned to this blueprint yet.</p>
             <button 
-              className="add-item-btn"
+              className="blueprint-btn primary"
               onClick={() => setAdding(true)}
             >
               <Plus size={16} /> Add First Item
             </button>
           </div>
         ) : (
-          <div className="table-container">
+          <div className="blueprint-table-card">
             <table className="blueprint-items-table">
               <thead>
                 <tr>
@@ -647,33 +647,36 @@ This item might be in use by existing containers. Please check and try again.`);
             </table>
           </div>
         )}
-      </div>
+      </section>
     );
   };
 
   /* ---------------------------- Main UI ---------------------------- */
   return (
-    <div className="parts-layout">
-      <div className="part-list-panel">
+    <div className="blueprints-layout">
+      <section className="blueprint-list-panel list-panel">
         <div className="list-panel-header">
           <h1>Container Blueprints</h1>
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search blueprints..."
-              value={typing}
-              onChange={(e) => setTyping(e.target.value)}
-            />
+          <div className="list-controls">
+            <div className="search-bar">
+              <Search className="search-icon" size={16} />
+              <input
+                type="text"
+                placeholder="Search blueprints..."
+                value={typing}
+                onChange={(e) => setTyping(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
         {err && <div className="error-banner">Error: {err}</div>}
 
-        <div className="part-list">
+        <div className="blueprint-list list-body">
           {blueprints.map(b => (
             <div
               key={b.blueprint_id}
-              className={`part-list-item ${selectedId === b.blueprint_id ? 'selected' : ''}`}
+              className={`list-item blueprint-list-item ${selectedId === b.blueprint_id ? 'selected' : ''}`}
               onClick={() => { setSelectedId(b.blueprint_id); setIsEditing(false); setActiveTab('general'); }}
             >
               <h3>{b.blueprint_name}</h3>
@@ -685,7 +688,7 @@ This item might be in use by existing containers. Please check and try again.`);
 
         <div className="list-panel-footer">
           <button 
-            className="add-blueprint-btn flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-md text-sm font-medium transition-colors"
+            className="add-blueprint-btn"
             onClick={() => setOpenAdd(true)}
           >
             <Plus size={18} /> Add Blueprint
@@ -710,22 +713,24 @@ This item might be in use by existing containers. Please check and try again.`);
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="part-detail-panel">
+      <section className="blueprint-detail-panel detail-panel">
         {!selected ? (
-          <p>Select a blueprint to see details.</p>
+          <div className="detail-empty-state blueprint-empty-state">
+            <p>Select a blueprint to see details.</p>
+          </div>
         ) : (
           <>
-            <div className="part-tabs">
+            <div className="blueprint-tabs">
               <button
-                className={`tab-btn ${activeTab === 'general' ? 'active' : ''}`}
+                className={`blueprint-tab ${activeTab === 'general' ? 'active' : ''}`}
                 onClick={() => setActiveTab('general')}
               >
                 General
               </button>
               <button
-                className={`tab-btn ${activeTab === 'items' ? 'active' : ''}`}
+                className={`blueprint-tab ${activeTab === 'items' ? 'active' : ''}`}
                 onClick={() => setActiveTab('items')}
               >
                 Items
@@ -752,7 +757,7 @@ This item might be in use by existing containers. Please check and try again.`);
             )}
           </>
         )}
-      </div>
+      </section>
 
       <AddBlueprintModal
         open={openAdd}

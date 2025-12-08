@@ -1,0 +1,540 @@
+/* Container Loadouts - Notion inspired */
+
+.content-scrollable .loadouts-layout .list-panel-header .list-controls {
+  width: 100%;
+  gap: 0.6rem;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.content-scrollable .loadouts-layout .list-panel-header .list-controls .search-bar {
+  flex: 1;
+  min-width: 220px;
+  margin: 0;
+  min-height: 38px;
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  padding: 0.35rem 0.75rem 0.35rem 2.25rem !important;
+}
+
+.content-scrollable .loadouts-layout .list-panel-header .list-controls .search-bar input {
+  padding: 0.35rem 0.35rem 0.35rem 0.75rem;
+  font-size: 0.9rem;
+  border: none;
+  background: transparent;
+}
+
+.loadouts-layout {
+  width: min(1300px, 100%);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: clamp(1.25rem, 2vw, 2.5rem);
+}
+
+.loadout-list-panel {
+  min-height: 640px;
+}
+
+.loadout-list {
+  min-height: 0;
+}
+
+.loadout-list-item h3 {
+  margin: 0 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--workspace-ink);
+}
+
+.loadout-list-item p {
+  margin: 0;
+  font-size: 0.83rem;
+  color: var(--workspace-muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+}
+
+.loadout-add-btn {
+  border: none;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.9rem 1.25rem;
+  font-weight: 600;
+  background: #0b1020;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 18px 45px rgba(11, 16, 32, 0.28);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.loadout-add-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 25px 65px rgba(11, 16, 32, 0.32);
+}
+
+.loadout-detail-panel {
+  min-height: 640px;
+  padding: clamp(1rem, 2vw, 2rem);
+}
+
+.loadout-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 1.5rem;
+  background: #ffffff;
+  margin-bottom: 0;
+}
+
+.loadout-tab {
+  background: transparent;
+  border: none;
+  border-radius: 0 !important;
+  padding: 1rem 1.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  margin-bottom: -1px;
+}
+
+.loadout-tab.active {
+  color: #111827;
+  font-weight: 600;
+  border-bottom-color: #111827;
+  background: transparent;
+  box-shadow: none;
+}
+
+.loadout-detail-card,
+.loadout-items-card {
+  background: #ffffff;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.loadout-table-wrapper {
+  margin-top: 0.75rem;
+  overflow-x: auto;
+}
+
+.loadout-detail-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.loadout-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 2rem 2.5rem;
+}
+
+.loadout-detail-item {
+  border-radius: 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.loadout-detail-item label {
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--workspace-muted);
+  font-weight: 600;
+}
+
+.loadout-detail-item p {
+  margin: 0.35rem 0 0;
+  font-weight: 600;
+  color: var(--workspace-ink);
+}
+
+.loadout-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.loadout-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.loadout-form-field label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--workspace-muted);
+  font-weight: 600;
+}
+
+.loadout-form-field input,
+.loadout-form-field textarea {
+  border-radius: 14px;
+  border: 1px solid rgba(17, 17, 23, 0.12);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.95rem;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.loadout-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.loadout-btn {
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.loadout-btn.pill {
+  background: #f9fafb;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.loadout-btn.neutral {
+  background: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+}
+
+.loadout-btn.primary {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+
+.loadout-btn.ghost {
+  background: #f9fafb;
+  color: #374151;
+  border-color: #d1d5db;
+}
+
+.loadout-btn:hover {
+  opacity: 0.9;
+}
+
+/* Modal styling scoped to loadouts */
+.loadouts-layout .modal-backdrop {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 3vh, 3rem);
+  overflow-y: auto;
+  z-index: 5000;
+}
+
+.loadouts-layout .modal {
+  width: min(760px, 100%);
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 26px 70px rgba(12, 18, 38, 0.28);
+  padding: 1.5rem 1.75rem;
+  max-height: min(90vh, 980px);
+  overflow: auto;
+  animation: loadoutModalSlideUp 0.22s ease;
+}
+
+.loadouts-layout .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.loadouts-layout .modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.loadouts-layout .modal-body {
+  padding: 1rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.loadouts-layout .modal-body .grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+
+.loadouts-layout .modal-body label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.loadouts-layout .modal-body input,
+.loadouts-layout .modal-body select,
+.loadouts-layout .modal-body textarea {
+  border: 1px solid rgba(17, 17, 23, 0.15);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  background: #ffffff;
+}
+
+.loadouts-layout .modal-body textarea {
+  resize: vertical;
+}
+
+.loadouts-layout .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.loadouts-layout .modal-actions .btn {
+  border-radius: 10px;
+  padding: 0.6rem 1.1rem;
+  font-weight: 600;
+}
+
+.loadouts-layout .modal-actions .btn-primary {
+  background: #0b1020;
+  color: #ffffff;
+  border: none;
+}
+
+.loadouts-layout .modal-actions .btn-secondary {
+  background: #f3f4f6;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+}
+
+@keyframes loadoutModalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.loadouts-layout .modal-body .checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .loadouts-layout .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .loadouts-layout .modal {
+    width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+}
+
+.loadout-empty-state {
+  border-radius: 24px;
+  border: 1px dashed rgba(17, 17, 23, 0.15);
+  padding: 2rem;
+  text-align: center;
+  color: var(--workspace-muted);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.no-data {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--workspace-muted);
+  font-weight: 600;
+}
+
+.loadout-items-card table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.loadout-items-card th {
+  text-align: left;
+  padding: 0.8rem 1rem;
+  color: var(--workspace-muted);
+  font-weight: 600;
+  border-bottom: 1px solid rgba(17, 17, 23, 0.08);
+}
+
+.loadout-items-card td {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(17, 17, 23, 0.06);
+  vertical-align: top;
+}
+
+.loadout-items-card tr:last-child td {
+  border-bottom: none;
+}
+
+.loadout-items-card .lot-chip {
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(17, 17, 23, 0.06);
+  font-size: 0.82rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.loadout-items-table th:last-child,
+.loadout-items-table td:last-child {
+  text-align: right;
+}
+
+.product-name {
+  font-weight: 600;
+  color: var(--workspace-ink);
+}
+
+.product-usage {
+  font-size: 0.85rem;
+  color: var(--workspace-muted);
+  margin-top: 0.2rem;
+}
+
+.text-muted {
+  color: var(--workspace-muted);
+  font-size: 0.85rem;
+}
+
+.text-muted.italic {
+  font-style: italic;
+}
+
+.lot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.lot-chip button {
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.lot-assignment-row {
+  background: rgba(17, 17, 23, 0.04);
+}
+
+.lot-assignment-form {
+  display: grid;
+  grid-template-columns: 2fr 1fr auto;
+  gap: 1rem;
+  align-items: end;
+}
+
+.lot-assignment-field label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--workspace-ink);
+}
+
+.lot-assignment-field select,
+.lot-assignment-field input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(17, 17, 23, 0.15);
+  padding: 0.5rem 0.7rem;
+}
+
+.lot-assignment-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.loadout-btn.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+@media (max-width: 1024px) {
+  .loadouts-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .loadout-detail-panel {
+    padding: 1.25rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .loadout-tabs {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .loadout-form-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .loadout-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .lot-assignment-form {
+    grid-template-columns: 1fr;
+  }
+}

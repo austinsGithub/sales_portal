@@ -3,24 +3,24 @@
    ========================================================================== */
 
 :root {
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-light: #dbeafe;
-  --background: #f8fafc;
+  --primary: #0f172a;
+  --primary-hover: #0b1223;
+  --primary-light: #e8ecf5;
+  --background: #ffffff;
   --card-bg: #ffffff;
-  --text: #1e293b;
-  --text-secondary: #64748b;
+  --text: #0f172a;
+  --text-secondary: #475569;
   --text-muted: #94a3b8;
   --border: #e2e8f0;
   --border-light: #f1f5f9;
   --border-radius: 12px;
   --border-radius-sm: 8px;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 10px -4px rgb(15 23 42 / 0.12);
+  --shadow-lg: 0 12px 30px -12px rgb(15 23 42 / 0.14);
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-  --gradient-secondary: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  --gradient-primary: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  --gradient-secondary: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
 }
 
 /* ==========================================================================
@@ -32,20 +32,12 @@
   max-width: 1600px;
   margin: 0 auto;
   min-height: calc(100vh - 80px);
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: var(--background);
   position: relative;
 }
 
 .admin-settings-container::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 200px;
-  background: var(--gradient-primary);
-  opacity: 0.05;
-  z-index: 0;
+  content: none;
 }
 
 .admin-settings-layout {
@@ -104,7 +96,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(135deg, var(--primary-light) 0%, rgba(255, 255, 255, 0.8) 100%);
+  background: #ffffff;
   border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
   margin: 0 1rem;
   width: calc(100% - 2rem);
@@ -138,7 +130,7 @@
   transition: var(--transition);
   position: relative;
   overflow: hidden;
-  opacity: 0.8; /* Default for non-active */
+  opacity: 0.85; /* Default for non-active */
   transform: translateX(0);
 }
 
@@ -171,7 +163,7 @@
 
 /* Hover for non-active items */
 .settings-nav .nav-item:not(.active):hover {
-  background: var(--primary-light);
+  background: #f5f7fb;
   color: var(--primary);
   transform: translateX(4px);
   opacity: 1;
@@ -191,34 +183,31 @@
 
 /* Active item */
 .settings-nav .nav-item.active {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
-  color: white;
+  background: #eef2ff;
+  color: var(--primary);
   font-weight: 700;
-  box-shadow: var(--shadow-lg);
-  transform: translateX(6px) scale(1.02);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: var(--shadow-md);
+  transform: translateX(6px) scale(1.01);
+  border: 1px solid #d9e2ff;
   opacity: 1;
 }
 
 .settings-nav .nav-item.active .nav-item-label {
-  color: white;
+  color: var(--primary);
   font-weight: 700;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .settings-nav .nav-item.active .nav-item-desc {
-  color: rgba(255, 255, 255, 0.95);
+  color: #334155;
   font-weight: 500;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .settings-nav .nav-item.active svg {
-  color: white;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+  color: var(--primary);
 }
 
 .settings-nav .nav-item.active .nav-item-arrow {
-  color: white;
+  color: var(--primary);
   transform: translateX(4px);
 }
 
@@ -229,7 +218,7 @@
   top: 0;
   bottom: 0;
   width: 4px;
-  background: white;
+  background: #0f172a;
   border-radius: 0 2px 2px 0;
 }
 
@@ -314,15 +303,16 @@
 
 .modal-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
   padding: 1rem;
 }
 
@@ -398,7 +388,7 @@
 .input:focus {
   outline: none;
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
 }
 
 /* ==========================================================================

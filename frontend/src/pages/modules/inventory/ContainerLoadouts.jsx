@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
-import './Parts.css';
+import { Plus, Search } from 'lucide-react';
+import './ContainerLoadouts.css';
 
 const PAGE_SIZE = 10;
 
@@ -19,25 +19,36 @@ const getAuthToken = () => {
   return token || '';
 };
 
-function AddLoadoutModal({ open, onClose, onCreated, authTokenStr, user }) {
-  if (!open) return null;
+const DEFAULT_ADD_FORM = {
+  blueprint_id: '',
+  location_id: '',
+  serial_suffix: '',
+  notes: '',
+};
 
+function AddLoadoutModal({ open, onClose, onCreated, authTokenStr, user }) {
   const [blueprints, setBlueprints] = useState([]);
   const [locations, setLocations] = useState([]);
-  const [form, setForm] = useState({
-    blueprint_id: '',
-    location_id: '',
-    serial_suffix: '',
-    notes: '',
-  });
+  const [form, setForm] = useState(DEFAULT_ADD_FORM);
   const [err, setErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Reset modal state each time it opens to avoid stale data
   useEffect(() => {
+    if (!open) return;
+    setForm({ ...DEFAULT_ADD_FORM });
+    setErr('');
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const abortCtrl = new AbortController();
+
     const fetchBlueprints = async () => {
       try {
         const url = buildApiUrl('api/inventory/container_blueprints/search');
         const res = await fetch(url, {
+          signal: abortCtrl.signal,
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${authTokenStr}` 
@@ -61,6 +72,7 @@ function AddLoadoutModal({ open, onClose, onCreated, authTokenStr, user }) {
         const url = buildApiUrl('api/inventory/locations');
         const token = getAuthToken();
         const response = await fetch(url, {
+          signal: abortCtrl.signal,
           headers: { 
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}` 
@@ -76,10 +88,10 @@ function AddLoadoutModal({ open, onClose, onCreated, authTokenStr, user }) {
       }
     };
 
-    if (open) {
-      fetchBlueprints();
-      fetchLocations();
-    }
+    fetchBlueprints();
+    fetchLocations();
+
+    return () => abortCtrl.abort();
   }, [open, authTokenStr]);
 
   const change = (e) => {
@@ -142,6 +154,8 @@ function AddLoadoutModal({ open, onClose, onCreated, authTokenStr, user }) {
       setSubmitting(false);
     }
   };
+
+  if (!open) return null;
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
@@ -221,8 +235,6 @@ function AddLoadoutModal({ open, onClose, onCreated, authTokenStr, user }) {
 }
 
 function DuplicateLoadoutModal({ open, onClose, onCreated, authTokenStr, user, sourceLoadout }) {
-  if (!open) return null;
-
   const [quantity, setQuantity] = useState(10);
   const [serialPrefix, setSerialPrefix] = useState('');
   const [startingSuffix, setStartingSuffix] = useState('001');
@@ -232,7 +244,21 @@ function DuplicateLoadoutModal({ open, onClose, onCreated, authTokenStr, user, s
 
   const presetQuantities = [10, 15, 50];
 
+  // Reset modal inputs between opens so old values don't stick
   useEffect(() => {
+    if (!open) return;
+    setQuantity(10);
+    setSerialPrefix('');
+    setStartingSuffix('001');
+    setErr('');
+    setSubmitting(false);
+    setLoading(true);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const abortCtrl = new AbortController();
+
     const fetchBlueprintPrefix = async () => {
       if (!sourceLoadout?.blueprint_id) return;
       
@@ -241,6 +267,7 @@ function DuplicateLoadoutModal({ open, onClose, onCreated, authTokenStr, user, s
         const res = await fetch(
           buildApiUrl(`api/inventory/container_blueprints/${sourceLoadout.blueprint_id}`),
           {
+            signal: abortCtrl.signal,
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${authTokenStr}`
@@ -272,9 +299,9 @@ function DuplicateLoadoutModal({ open, onClose, onCreated, authTokenStr, user, s
       }
     };
 
-    if (open) {
-      fetchBlueprintPrefix();
-    }
+    fetchBlueprintPrefix();
+
+    return () => abortCtrl.abort();
   }, [open, sourceLoadout, authTokenStr]);
 
   const submit = async () => {
@@ -336,6 +363,8 @@ function DuplicateLoadoutModal({ open, onClose, onCreated, authTokenStr, user, s
       setSubmitting(false);
     }
   };
+
+  if (!open) return null;
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
@@ -600,7 +629,7 @@ export default function ContainerLoadouts() {
   const saveGeneral = async (loadout_id, patch) => {
     try {
       const res = await fetch(`${API_BASE}/${loadout_id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token || getAuthToken()}`
@@ -630,31 +659,31 @@ export default function ContainerLoadouts() {
   const totalPages = totalCount ? Math.ceil(totalCount / PAGE_SIZE) : null;
 
   const LoadoutDetails = ({ loadout, onEdit }) => (
-    <div className="part-detail-content">
+    <div className="loadout-detail-card">
       <div className="detail-header">
         <h2>{loadout.blueprint_name} - {loadout.serial_suffix || `#${loadout.loadout_id}`}</h2>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button onClick={() => setOpenDuplicate(true)} className="edit-btn" style={{ backgroundColor: '#10b981' }}>
+        <div className="loadout-detail-actions">
+          <button onClick={() => setOpenDuplicate(true)} className="loadout-btn pill neutral">
             Duplicate
           </button>
-          <button onClick={onEdit} className="edit-btn">Edit</button>
+          <button onClick={onEdit} className="loadout-btn pill">Edit</button>
         </div>
       </div>
       
-      <div className="detail-grid">
-        <div className="detail-item">
+      <div className="loadout-detail-grid">
+        <div className="loadout-detail-item">
           <label>Blueprint</label>
           <p>{loadout.blueprint_name || 'N/A'}</p>
         </div>
-        <div className="detail-item">
+        <div className="loadout-detail-item">
           <label>Location</label>
           <p>{loadout.location_name || 'N/A'}</p>
         </div>
-        <div className="detail-item">
+        <div className="loadout-detail-item">
           <label>Serial Suffix</label>
           <p>{loadout.serial_suffix || '—'}</p>
         </div>
-        <div className="detail-item col-span-2">
+        <div className="loadout-detail-item col-span-2">
           <label>Notes</label>
           <p>{loadout.notes || '—'}</p>
         </div>
@@ -674,24 +703,24 @@ export default function ContainerLoadouts() {
     };
 
     return (
-      <div className="part-detail-content">
+      <div className="loadout-detail-card">
         <h2>Edit Loadout</h2>
 
-        <div className="form-grid">
-          <div className="form-field">
+        <div className="loadout-form-grid">
+          <div className="loadout-form-field">
             <label>Serial Suffix</label>
             <input name="serial_suffix" value={form.serial_suffix} onChange={change} />
           </div>
-          <div className="form-field col-span-2">
+          <div className="loadout-form-field col-span-2">
             <label>Notes</label>
             <textarea name="notes" rows={4} value={form.notes} onChange={change} />
           </div>
         </div>
 
-        <div className="form-actions">
-          <button className="cancel-btn" onClick={onCancel}>Cancel</button>
+        <div className="loadout-form-actions">
+          <button className="loadout-btn ghost" onClick={onCancel}>Cancel</button>
           <button 
-            className="update-btn"
+            className="loadout-btn primary"
             onClick={() => {
               const updateData = {
                 serial_suffix: form.serial_suffix || null,
@@ -707,7 +736,7 @@ export default function ContainerLoadouts() {
     );
   };
 
-  const LoadoutItems = ({ loadoutId, blueprintId }) => {
+  const LoadoutItems = ({ loadoutId, blueprintId, loadoutLocationId }) => {
     const [blueprintItems, setBlueprintItems] = useState([]);
     const [assignedLots, setAssignedLots] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -840,25 +869,27 @@ export default function ContainerLoadouts() {
           );
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const data = await res.json();
-          setAvailableLots(
-            Array.isArray(data)
-              ? data
-                  .filter(item => Number(item.quantity_available) > 0)
-                  .map(item => ({
-                    lot_id: item.lot_id,
-                    lot_number: item.lot_number,
-                    quantity_available: item.quantity_available,
-                    expiration_date: item.expiration_date
-                  }))
-              : []
-          );
+          const lots = Array.isArray(data)
+            ? data
+                .filter(item => Number(item.quantity_available) > 0)
+                .filter(item =>
+                  loadoutLocationId ? Number(item.location_id) === Number(loadoutLocationId) : true
+                )
+                .map(item => ({
+                  lot_id: item.lot_id,
+                  lot_number: item.lot_number,
+                  quantity_available: item.quantity_available,
+                  expiration_date: item.expiration_date
+                }))
+            : [];
+          setAvailableLots(lots);
         } catch (e) {
           console.error('Error fetching inventory:', e);
         }
       };
 
       fetchAvailableLots();
-    }, [assigningToItem]);
+    }, [assigningToItem, loadoutLocationId]);
 
     const assignLot = async () => {
       if (!selectedLot.lot_id || !assigningToItem) return;
@@ -890,14 +921,18 @@ export default function ContainerLoadouts() {
           })
         });
         
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const msg = errData.message || `HTTP ${res.status}`;
+          throw new Error(msg);
+        }
         const created = await res.json();
         setAssignedLots(prev => [...prev, created]);
         setAssigningToItem(null);
         setSelectedLot({ lot_id: '', quantity_used: 1 });
       } catch (e) {
         console.error('Error assigning lot:', e);
-        alert('Failed to assign lot: ' + e.message);
+        alert('Failed to assign lot: ' + (e.message || 'Unknown error'));
       }
     };
 
@@ -918,25 +953,27 @@ export default function ContainerLoadouts() {
       }
     };
 
-    if (loading) return <div>Loading items...</div>;
+    if (loading) return <div className="loading-row">Loading items...</div>;
 
     return (
-      <div className="part-detail-content">
+      <div className="loadout-items-card">
         <div className="detail-header">
           <h2>Blueprint Items</h2>
         </div>
 
         {blueprintItems.length === 0 ? (
-          <p>No items in this blueprint.</p>
+          <div className="loadout-empty-state">
+            <p>No items in this blueprint.</p>
+          </div>
         ) : (
-          <div style={{ marginTop: '1rem' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="loadout-table-wrapper">
+            <table className="loadout-items-table">
               <thead>
-                <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>Product</th>
-                  <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>Required Qty</th>
-                  <th style={{ textAlign: 'left', padding: '0.75rem', fontWeight: '600' }}>Assigned Lots</th>
-                  <th style={{ textAlign: 'right', padding: '0.75rem', fontWeight: '600' }}>Actions</th>
+                <tr>
+                  <th>Product</th>
+                  <th>Required Qty</th>
+                  <th>Assigned Lots</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -950,82 +987,45 @@ export default function ContainerLoadouts() {
                   
                   return (
                     <React.Fragment key={item.blueprint_item_id}>
-                      <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                        <td style={{ padding: '1rem' }}>
-                          <div style={{ fontWeight: '500' }}>
+                      <tr>
+                        <td>
+                          <div className="product-name">
                             {item.product_name || `Product #${item.product_id}`}
                           </div>
                           {item.usage_notes && (
-                            <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                              {item.usage_notes}
-                            </div>
+                            <div className="product-usage">{item.usage_notes}</div>
                           )}
                         </td>
-                        <td style={{ padding: '1rem' }}>
+                        <td>
                           {requiredQty}
                           {item.quantity_max && item.quantity_max !== requiredQty && (
-                            <span style={{ color: '#6b7280' }}> - {item.quantity_max}</span>
+                            <span className="text-muted"> - {item.quantity_max}</span>
                           )}
-                          <div style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                          <div className="text-muted">
                             Assigned: {assignedQty} • Remaining: {remainingQty}
                           </div>
                         </td>
-                        <td style={{ padding: '1rem' }}>
+                        <td>
                           {itemLots.length === 0 ? (
-                            <span style={{ color: '#9ca3af', fontStyle: 'italic', fontSize: '0.875rem' }}>
-                              No lots assigned
-                            </span>
+                            <span className="text-muted italic">No lots assigned</span>
                           ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                            <div className="lot-list">
                               {itemLots.map(lot => (
-                                <div key={lot.loadout_lot_id} style={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center',
-                                  gap: '0.5rem',
-                                  fontSize: '0.875rem'
-                                }}>
-                                  <span style={{ fontWeight: '500' }}>
-                                    {lot.lot_number || `Lot #${lot.lot_id}`}
-                                  </span>
-                                  <span style={{ color: '#6b7280' }}>
-                                    (Qty: {lot.quantity_used})
-                                  </span>
-                                  <button 
-                                    onClick={() => removeLot(lot.loadout_lot_id)}
-                                    style={{ 
-                                      background: 'transparent',
-                                      color: '#ef4444', 
-                                      border: 'none', 
-                                      cursor: 'pointer',
-                                      padding: '0.125rem',
-                                      fontSize: '1rem'
-                                    }}
-                                    title="Remove lot"
-                                  >
-                                    ×
-                                  </button>
+                                <div key={lot.loadout_lot_id} className="lot-chip">
+                                  <span>{lot.lot_number || `Lot #${lot.lot_id}`}</span>
+                                  <span className="text-muted">(Qty: {lot.quantity_used})</span>
+                                  <button onClick={() => removeLot(lot.loadout_lot_id)} title="Remove lot">×</button>
                                 </div>
                               ))}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '1rem', textAlign: 'right' }}>
+                        <td>
                           {!isAssigning && (
                             <button 
                               onClick={() => canAssignMore && setAssigningToItem(item)}
                               disabled={!canAssignMore}
-                              style={{
-                                backgroundColor: canAssignMore ? '#3b82f6' : '#cbd5f5',
-                                color: canAssignMore ? 'white' : '#64748b',
-                                border: 'none',
-                                padding: '0.5rem 1rem',
-                                borderRadius: '0.375rem',
-                                cursor: canAssignMore ? 'pointer' : 'not-allowed',
-                                fontSize: '0.875rem',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem'
-                              }}
+                              className={`loadout-btn primary ${!canAssignMore ? 'disabled' : ''}`}
                               title={
                                 canAssignMore
                                   ? 'Assign another lot'
@@ -1039,18 +1039,11 @@ export default function ContainerLoadouts() {
                       </tr>
                       
                       {isAssigning && (
-                        <tr style={{ backgroundColor: '#f9fafb' }}>
-                          <td colSpan={4} style={{ padding: '1rem' }}>
-                            <div style={{ 
-                              display: 'grid',
-                              gridTemplateColumns: '2fr 1fr auto',
-                              gap: '1rem',
-                              alignItems: 'end'
-                            }}>
-                              <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                                  Select Lot
-                                </label>
+                        <tr className="lot-assignment-row">
+                          <td colSpan={4}>
+                            <div className="lot-assignment-form">
+                              <div className="lot-assignment-field">
+                                <label>Select Lot</label>
                                 <select 
                                   value={selectedLot.lot_id} 
                                   onChange={(e) => {
@@ -1063,12 +1056,6 @@ export default function ContainerLoadouts() {
                                       quantity_used: Math.max(1, Math.min(selectedLot.quantity_used, maxQty)) 
                                     });
                                   }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '0.5rem',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '0.375rem'
-                                  }}
                                 >
                                   <option value="">Select lot...</option>
                                   {availableLots.map(lot => (
@@ -1078,10 +1065,8 @@ export default function ContainerLoadouts() {
                                   ))}
                                 </select>
                               </div>
-                              <div>
-                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', fontWeight: '500' }}>
-                                  Quantity
-                                </label>
+                              <div className="lot-assignment-field">
+                                <label>Quantity</label>
                                 <input 
                                   type="number" 
                                   min="1"
@@ -1096,46 +1081,27 @@ export default function ContainerLoadouts() {
                                     const newQty = Math.max(1, Math.min(Number(e.target.value) || 1, maxQty));
                                     setSelectedLot(prev => ({ ...prev, quantity_used: newQty }));
                                   }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '0.5rem',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '0.375rem'
-                                  }}
                                 />
                                 {selectedLot.lot_id && (
-                                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                  <div className="text-muted">
                                     Max available: {availableLots.find(l => l.lot_id === Number(selectedLot.lot_id))?.quantity_available || 0}
                                   </div>
                                 )}
                               </div>
-                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                              <div className="lot-assignment-actions">
                                 <button 
                                   onClick={() => {
                                     setAssigningToItem(null);
                                     setSelectedLot({ lot_id: '', quantity_used: 1 });
                                   }}
-                                  style={{
-                                    padding: '0.5rem 1rem',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '0.375rem',
-                                    backgroundColor: 'white',
-                                    cursor: 'pointer'
-                                  }}
+                                  className="loadout-btn ghost"
                                 >
                                   Cancel
                                 </button>
                                 <button 
                                   onClick={assignLot}
                                   disabled={!selectedLot.lot_id}
-                                  style={{
-                                    padding: '0.5rem 1rem',
-                                    border: 'none',
-                                    borderRadius: '0.375rem',
-                                    backgroundColor: selectedLot.lot_id ? '#3b82f6' : '#d1d5db',
-                                    color: 'white',
-                                    cursor: selectedLot.lot_id ? 'pointer' : 'not-allowed'
-                                  }}
+                                  className={`loadout-btn primary ${!selectedLot.lot_id ? 'disabled' : ''}`}
                                 >
                                   Assign
                                 </button>
@@ -1156,23 +1122,26 @@ export default function ContainerLoadouts() {
   };
 
   return (
-    <div className="parts-layout">
-      <div className="part-list-panel">
+    <div className="loadouts-layout">
+      <section className="loadout-list-panel list-panel">
         <div className="list-panel-header">
           <h1>Container Loadouts</h1>
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search loadouts..."
-              value={typing}
-              onChange={(e) => setTyping(e.target.value)}
-            />
+          <div className="list-controls">
+            <div className="search-bar">
+              <Search className="search-icon" size={16} />
+              <input
+                type="text"
+                placeholder="Search loadouts..."
+                value={typing}
+                onChange={(e) => setTyping(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
         {err && <div className="error-banner">Error: {err}</div>}
 
-        <div className="part-list">
+        <div className="loadout-list list-body">
           {loading ? (
             <div className="loading-row">Loading…</div>
           ) : loadouts.length === 0 ? (
@@ -1181,7 +1150,7 @@ export default function ContainerLoadouts() {
             loadouts.map(l => (
               <div 
                 key={l.loadout_id}
-                className={`part-list-item ${selectedId === l.loadout_id ? 'selected' : ''}`}
+                className={`list-item loadout-list-item ${selectedId === l.loadout_id ? 'selected' : ''}`}
                 onClick={() => { setSelectedId(l.loadout_id); setIsEditing(false); setActiveTab('general'); }}
               >
                 <h3>{l.blueprint_name || 'Untitled Loadout'}</h3>
@@ -1199,7 +1168,7 @@ export default function ContainerLoadouts() {
 
         <div className="list-panel-footer">
           <button 
-            className="add-blueprint-btn flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-md text-sm font-medium transition-colors"
+            className="loadout-add-btn"
             onClick={() => setOpenAdd(true)}
           >
             <Plus size={18} /> Add Loadout
@@ -1224,22 +1193,24 @@ export default function ContainerLoadouts() {
             </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="part-detail-panel">
+      <section className="loadout-detail-panel detail-panel">
         {!selected ? (
-          <p>Select a loadout to see details.</p>
+          <div className="detail-empty-state loadout-empty-state">
+            <p>Select a loadout to see details.</p>
+          </div>
         ) : (
           <>
-            <div className="part-tabs">
+            <div className="loadout-tabs">
               <button
-                className={`tab-btn ${activeTab === 'general' ? 'active' : ''}`}
+                className={`loadout-tab ${activeTab === 'general' ? 'active' : ''}`}
                 onClick={() => setActiveTab('general')}
               >
                 General
               </button>
               <button
-                className={`tab-btn ${activeTab === 'items' ? 'active' : ''}`}
+                className={`loadout-tab ${activeTab === 'items' ? 'active' : ''}`}
                 onClick={() => setActiveTab('items')}
               >
                 Items & Lots
@@ -1262,11 +1233,15 @@ export default function ContainerLoadouts() {
             )}
 
             {activeTab === 'items' && selected && (
-              <LoadoutItems loadoutId={selected.loadout_id} blueprintId={selected.blueprint_id} />
+              <LoadoutItems
+                loadoutId={selected.loadout_id}
+                blueprintId={selected.blueprint_id}
+                loadoutLocationId={selected.location_id}
+              />
             )}
           </>
         )}
-      </div>
+      </section>
 
       <AddLoadoutModal
         open={openAdd}

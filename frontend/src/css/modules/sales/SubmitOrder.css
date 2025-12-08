@@ -243,3 +243,21 @@
   color: #6c757d;
   margin-top: 1rem;
 }
+
+.error-banner {
+  background-color: #ffe3e3;
+  color: #b02a37;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #f1aeb5;
+  margin-bottom: 1rem;
+}
+
+.status-banner {
+  background-color: #e7f5ff;
+  color: #0b7285;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #a5d8ff;
+  margin-bottom: 1rem;
+}

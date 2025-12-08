@@ -31,6 +31,7 @@ const getReceivingSearch = (query) => `api/procurement/receiving/search?q=${enco
 // Inventory
 const API_INVENTORY_PARTS = 'api/inventory/parts';
 const API_INVENTORY_LOCATIONS = 'api/inventory/locations';
+const API_INVENTORY_BINS = 'api/inventory/bins';
 
 // Suppliers
 const API_SUPPLIERS = 'api/procurement/suppliers';
@@ -138,6 +139,7 @@ function ScanModal({ open, onClose, onAdd, parts, suppliers, locations, purchase
   const [selectedPart, setSelectedPart] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedBin, setSelectedBin] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [quantityTouched, setQuantityTouched] = useState(false);
   const [lotNumber, setLotNumber] = useState('');
@@ -154,6 +156,8 @@ function ScanModal({ open, onClose, onAdd, parts, suppliers, locations, purchase
   const [scanStatus, setScanStatus] = useState('');
   const [selectedPOLine, setSelectedPOLine] = useState('');
   const [formErrors, setFormErrors] = useState({});
+  const [bins, setBins] = useState([]);
+  const [loadingBins, setLoadingBins] = useState(false);
   
   const videoRef = useRef(null);
   const codeReaderRef = useRef(null);
@@ -168,6 +172,11 @@ function ScanModal({ open, onClose, onAdd, parts, suppliers, locations, purchase
     if (!selectedPart) return null;
     return parts.find(p => p.part_id === Number(selectedPart)) || null;
   }, [selectedPart, parts]);
+
+  const partGtin = selectedPartDetails?.gtin || '';
+  const partSku = selectedPartDetails?.sku || '';
+  const displayGtin = partGtin || gtin;
+  const displaySku = partSku || sku;
 
   const supplierDisplayName = useMemo(() => {
     if (purchaseOrder?.supplier_name) return purchaseOrder.supplier_name;
@@ -204,8 +213,31 @@ function ScanModal({ open, onClose, onAdd, parts, suppliers, locations, purchase
       if (purchaseOrder?.lines && purchaseOrder.lines.length === 1) {
         setSelectedPOLine(purchaseOrder.lines[0].po_line_id.toString());
       }
+      // Fetch bins when modal opens
+      loadBins();
     }
   }, [open, purchaseOrder, locations]);
+
+  const loadBins = async () => {
+    try {
+      setLoadingBins(true);
+      const response = await fetch(buildApiUrl(API_INVENTORY_BINS), {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to load bins');
+
+      const data = await response.json();
+      const binsArray = Array.isArray(data) ? data : (data.data || []);
+      setBins(binsArray);
+    } catch (err) {
+      console.error('Error loading bins:', err);
+    } finally {
+      setLoadingBins(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedPart && parts.length > 0) {
@@ -213,9 +245,13 @@ function ScanModal({ open, onClose, onAdd, parts, suppliers, locations, purchase
       if (part) {
         if (part.gtin) setGtin(part.gtin);
         if (part.sku) setSku(part.sku);
+        // Auto-select preferred bin if part has one
+        if (part.preferred_bin_id && !selectedBin) {
+          setSelectedBin(part.preferred_bin_id.toString());
+        }
       }
     }
-  }, [selectedPart, parts]);
+  }, [selectedPart, parts, selectedBin]);
 
   // Auto-select the part when the PO line changes to prevent mismatch
   useEffect(() => {
@@ -234,6 +270,29 @@ function ScanModal({ open, onClose, onAdd, parts, suppliers, locations, purchase
     }
   }, [selectedLine, quantityTouched, remainingQty, orderedQty]);
 
+  // Real-time validation for lot number and expiration date
+  useEffect(() => {
+    if (formErrors.lotNumber || formErrors.expirationDate) {
+      // Clear errors if the validation condition is no longer violated
+      if (expirationDate && lotNumber.trim()) {
+        setFormErrors(prev => {
+          const updated = { ...prev };
+          delete updated.lotNumber;
+          delete updated.expirationDate;
+          return updated;
+        });
+      } else if (!expirationDate) {
+        // Clear errors if expiration date is removed
+        setFormErrors(prev => {
+          const updated = { ...prev };
+          delete updated.lotNumber;
+          delete updated.expirationDate;
+          return updated;
+        });
+      }
+    }
+  }, [lotNumber, expirationDate, formErrors.lotNumber, formErrors.expirationDate]);
+
   const resetForm = () => {
     setScannedData('');
     setParsedData(null);
@@ -244,6 +303,7 @@ function ScanModal({ open, onClose, onAdd, parts, suppliers, locations, purchase
       setSelectedSupplier('');
     }
     setSelectedLocation('');
+    setSelectedBin('');
     setQuantity('1');
     setLotNumber('');
     setGtin('');
@@ -384,7 +444,7 @@ const startCamera = async () => {
 
   const validateForm = () => {
     const errors = {};
-    
+
     if (!selectedPart) errors.selectedPart = 'Please select a part';
     if (!selectedLocation) errors.selectedLocation = 'Please select a location';
     if (!quantity || Number(quantity) <= 0) errors.quantity = 'Quantity must be greater than 0';
@@ -392,7 +452,13 @@ const startCamera = async () => {
     if (!purchaseOrder?.supplier_id && !selectedSupplier) {
       errors.selectedSupplier = 'Assign a supplier to this purchase order before receiving.';
     }
-    
+
+    // Validate that expiration date requires a lot number
+    if (expirationDate && !lotNumber.trim()) {
+      errors.lotNumber = 'Lot number is required when expiration date is provided';
+      errors.expirationDate = 'Cannot set expiration without a lot number';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -434,28 +500,31 @@ const startCamera = async () => {
         part_id: Number(selectedPart),
         supplier_id: Number(selectedSupplier),
         location_id: Number(selectedLocation),
+        bin_id: selectedBin ? Number(selectedBin) : null,
         quantity_received: Number(quantity),
         lot_number: lotNumber || null,
         serial_number: serialNumber || null,
         expiration_date: expirationDate || null,
         notes: notes || null,
-        gtin: gtin || null,
-        sku: sku || null,
+        gtin: partGtin || gtin || null,
+        sku: partSku || sku || null,
         po_line_id: Number(selectedPOLine)
       };
 
       await onAdd(itemData);
       setSuccess('Item added successfully!');
       
-      // Reset form but keep supplier and location selected
+      // Reset form but keep supplier, location, and bin selected
       setTimeout(() => {
         const currentSupplier = selectedSupplier;
         const currentLocation = selectedLocation;
+        const currentBin = selectedBin;
         resetForm();
         setSelectedSupplier(currentSupplier);
         setSelectedLocation(currentLocation);
+        setSelectedBin(currentBin);
         setSuccess('');
-        
+
         if (scanMode === 'keyboard' && scanInputRef.current) {
           scanInputRef.current.focus();
         }
@@ -483,7 +552,15 @@ const startCamera = async () => {
   if (!open) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay scan-modal-overlay" onClick={onClose}>
+      <button
+        type="button"
+        className="mobile-scan-close"
+        aria-label="Close scan modal"
+        onClick={onClose}
+      >
+        <X size={20} />
+      </button>
       <div className="modal-content scan-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
@@ -685,6 +762,32 @@ const startCamera = async () => {
                 </div>
 
                 <div className="form-group">
+                  <label className="form-label">GTIN</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={displayGtin || ''}
+                    placeholder="Auto from part"
+                    readOnly
+                    disabled
+                  />
+                  <span className="helper-text">Locked to the selected part.</span>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">SKU</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={displaySku || ''}
+                    placeholder="Auto from part"
+                    readOnly
+                    disabled
+                  />
+                  <span className="helper-text">Locked to the selected part.</span>
+                </div>
+
+                <div className="form-group">
                   <label className="form-label">Supplier</label>
                   <div className="form-static">
                     {supplierDisplayName}
@@ -718,6 +821,30 @@ const startCamera = async () => {
                   {formErrors.selectedLocation && (
                     <span className="error-text">{formErrors.selectedLocation}</span>
                   )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Bin</label>
+                  <select
+                    className="form-input"
+                    value={selectedBin}
+                    onChange={(e) => setSelectedBin(e.target.value)}
+                    disabled={loadingBins}
+                  >
+                    <option value="">Select bin (optional)</option>
+                    {bins
+                      .filter(b => !selectedLocation || b.location_id === Number(selectedLocation))
+                      .map(bin => (
+                        <option key={bin.bin_id} value={bin.bin_id}>
+                          {bin.location_name ? `${bin.location_name} - ` : ''}
+                          {[bin.aisle, bin.rack, bin.shelf, bin.bin].filter(Boolean).join('-') || `Bin ${bin.bin_id}`}
+                          {bin.zone ? ` (${bin.zone})` : ''}
+                        </option>
+                      ))}
+                  </select>
+                  <span className="helper-text">
+                    {selectedPartDetails?.preferred_bin_id ? '✓ Auto-filled from part preferences' : 'Specific bin for storage'}
+                  </span>
                 </div>
 
                 {selectedLine && (
@@ -770,11 +897,14 @@ const startCamera = async () => {
                   <label className="form-label">Lot Number</label>
                   <input
                     type="text"
-                    className="form-input"
+                    className={`form-input ${formErrors.lotNumber ? 'error' : ''}`}
                     value={lotNumber}
                     onChange={(e) => setLotNumber(e.target.value)}
                     placeholder="Optional"
                   />
+                  {formErrors.lotNumber && (
+                    <span className="error-text">{formErrors.lotNumber}</span>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -792,33 +922,13 @@ const startCamera = async () => {
                   <label className="form-label">Expiry Date</label>
                   <input
                     type="date"
-                    className="form-input"
+                    className={`form-input ${formErrors.expirationDate ? 'error' : ''}`}
                     value={expirationDate}
                     onChange={(e) => setExpirationDate(e.target.value)}
                   />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">GTIN</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={gtin}
-                    onChange={(e) => setGtin(e.target.value)}
-                    placeholder="Optional"
-                    readOnly={!!parsedData?.gtin}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">SKU</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    placeholder="Optional"
-                  />
+                  {formErrors.expirationDate && (
+                    <span className="error-text">{formErrors.expirationDate}</span>
+                  )}
                 </div>
 
                 <div className="form-group form-grid-full">
@@ -847,20 +957,20 @@ const startCamera = async () => {
 
               <div className="modal-footer" style={{ marginTop: '1.5rem' }}>
                 <button
-                  type="button"
-                  onClick={onClose}
-                  className="btn btn-secondary"
-                  disabled={loading}
-                >
-                  Close
-                </button>
-                <button
                   type="submit"
                   className="btn btn-primary"
                   disabled={loading}
                 >
                   <Plus size={16} />
                   {loading ? 'Adding...' : 'Add Item'}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="btn btn-secondary"
+                  disabled={loading}
+                >
+                  Close
                 </button>
               </div>
             </form>
@@ -1029,6 +1139,54 @@ function Receiving() {
       console.error('Error loading locations:', err);
     }
   };
+
+  const loadPurchaseOrder = useCallback(
+    async (purchaseOrderId) => {
+      const targetId = Number(purchaseOrderId);
+      if (!targetId || Number.isNaN(targetId)) {
+        throw new Error('Invalid purchase order ID');
+      }
+
+      try {
+        const response = await fetch(buildApiUrl(getPurchaseOrderById(targetId)), {
+          headers: {
+            'Authorization': `Bearer ${getAuthToken()}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load purchase order');
+        }
+
+        const data = await response.json();
+        const poData = data?.order
+          ? { ...data.order, lines: data.lines || data.order.lines || [] }
+          : (Array.isArray(data) ? data[0] : data);
+
+        if (!poData) {
+          throw new Error('Purchase order not found');
+        }
+
+        setSelectedPO((current) =>
+          current?.purchase_order_id === targetId ? poData : current
+        );
+
+        setPurchaseOrders((prev) => {
+          const exists = prev.some((po) => po.purchase_order_id === targetId);
+          if (!exists) return prev;
+          return prev.map((po) =>
+            po.purchase_order_id === targetId ? { ...po, ...poData } : po
+          );
+        });
+
+        return poData;
+      } catch (err) {
+        console.error('Error loading purchase order:', err);
+        throw err;
+      }
+    },
+    []
+  );
 
   const handleSelectPO = async (po) => {
     try {

@@ -1,181 +1,218 @@
-/* Shared detail panel visuals used across modules */
 :root {
-  --detail-panel-radius: 18px;
-  --detail-panel-border: #e6ecf3;
-  --detail-panel-shadow: 0 20px 45px rgba(15, 18, 34, 0.1);
+  --detail-panel-border: #e5e7eb;
+  --detail-panel-shadow: none;
   --detail-panel-bg: #ffffff;
 }
 
-.detail-panel {
-  width: 100%;
-  height: 100%;
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) {
+  position: relative;
   display: flex;
   flex-direction: column;
-  padding: clamp(0.65rem, 1vw, 1.1rem);
-  border-radius: calc(var(--detail-panel-radius) + 6px);
-  background: #f6f8fb;
-}
-
-.detail-card {
-  flex: 1;
-  background: var(--detail-panel-bg);
-  border-radius: var(--detail-panel-radius);
+  gap: 0;
+  background: #ffffff;
   border: 1px solid var(--detail-panel-border);
+  border-radius: 0;
   box-shadow: var(--detail-panel-shadow);
-  padding: clamp(1.5rem, 2vw, 2.5rem);
-  display: flex;
-  flex-direction: column;
-  gap: 1.4rem;
-  color: #131522;
+  padding: 0;
+  min-height: 0;
+  color: #111827;
+  backdrop-filter: none;
 }
 
-.detail-header {
+.content-scrollable :is(.detail-panel, [class*="detail-panel"])::after {
+  content: none;
+}
+
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) > * {
+  position: relative;
+  z-index: 1;
+}
+
+.detail-header,
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) .detail-header {
   display: flex;
-  align-items: flex-start;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border-bottom: 1px solid rgba(224, 228, 237, 0.9);
-  padding-bottom: 1rem;
-  flex-wrap: wrap;
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: #ffffff;
 }
 
 .detail-header h2,
-.detail-title {
-  font-size: clamp(1.25rem, 2vw, 1.65rem);
-  font-weight: 700;
-  color: #0f172a;
+.detail-title,
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) h2 {
   margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #111827;
+  letter-spacing: -0.02em;
 }
 
 .detail-subtitle {
-  margin-top: 4px;
-  color: #6b7280;
+  margin-top: 0.3rem;
+  color: var(--workspace-muted);
   font-size: 0.95rem;
 }
 
 .detail-actions {
   display: flex;
-  gap: 0.5rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.detail-actions .btn,
-.detail-actions button {
-  padding: 0.45rem 1.1rem;
-  border-radius: 999px;
-  border: 1px solid rgba(17, 21, 34, 0.2);
-  background: #ffffff;
-  color: #151822;
-  font-weight: 600;
+.detail-actions button,
+.detail-actions .btn {
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #f9fafb;
+  padding: 0.5rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.15s ease;
+  color: #374151;
 }
 
-.detail-actions .btn.primary,
-.detail-actions button.primary {
-  background: #2673ff;
-  color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 12px 18px rgba(38, 115, 255, 0.35);
-}
-
-.detail-actions .btn.danger,
-.detail-actions button.danger {
-  background: #fff;
-  color: #d93c45;
-  border-color: rgba(217, 60, 69, 0.4);
+.detail-actions button.primary,
+.detail-actions .btn.primary {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #3b82f6;
+  box-shadow: none;
 }
 
 .detail-actions button:hover,
 .detail-actions .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
-}
-
-.detail-grid {
-  display: table;
-  width: 100%;
-  border-collapse: collapse;
-  border: 1px solid #dee3ed;
-  border-radius: 0;
+  background: #e5e7eb;
+  border-color: #9ca3af;
   box-shadow: none;
 }
 
-.detail-item {
-  display: table-row;
-  background: #ffffff;
-  border-bottom: 1px solid #eceff5;
+.detail-actions button.primary:hover,
+.detail-actions .btn.primary:hover {
+  background: #2563eb;
+  border-color: #2563eb;
 }
 
-.detail-item:last-child {
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 2rem 2.5rem;
   border-bottom: none;
 }
 
-.detail-item label,
-.detail-item .label,
-.detail-item p,
-.detail-item .value {
-  display: table-cell;
-  padding: 0.85rem 1rem;
-  vertical-align: middle;
-  border-right: 1px solid #eceff5;
-}
-
-.detail-item label:last-child,
-.detail-item .label:last-child,
-.detail-item p:last-child,
-.detail-item .value:last-child {
-  border-right: none;
+.detail-item {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .detail-item label,
 .detail-item .label {
-  font-size: 0.75rem;
-  letter-spacing: 0.07em;
+  display: block;
+  font-size: 0.6875rem;
   text-transform: uppercase;
-  color: #8a92ae;
-  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 }
 
 .detail-item p,
 .detail-item .value {
   margin: 0;
-  color: #0f172a;
-  font-size: 1rem;
+  font-size: 0.9375rem;
+  color: #111827;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-direction: row;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem 1.5rem;
+  flex-wrap: wrap;
+}
+
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions button,
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions .btn {
+  border-radius: 12px;
+  padding: 0.6rem 1.1rem;
+  min-width: 140px;
+  width: auto;
   font-weight: 600;
-  word-break: break-word;
+  box-shadow: none;
+}
+
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions .btn.secondary,
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions .cancel-btn {
+  background: rgba(17, 17, 23, 0.05);
+  border: 1px solid rgba(17, 17, 23, 0.12);
+  color: #1f2937;
+}
+
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions .btn.primary,
+.content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions .update-btn {
+  background: #111322;
+  color: #ffffff;
+  border: 1px solid #111322;
+  box-shadow: 0 10px 22px rgba(17, 17, 34, 0.18);
 }
 
 .detail-empty-state {
-  border: 1px dashed rgba(203, 213, 225, 0.9);
-  border-radius: 18px;
-  padding: 2rem;
+  border: 1px dashed rgba(17, 17, 23, 0.12);
+  border-radius: 16px;
+  padding: 1.5rem;
   text-align: center;
-  color: #475569;
+  color: var(--workspace-muted);
   background: rgba(255, 255, 255, 0.7);
 }
 
-@media (max-width: 768px) {
-  .detail-panel {
-    padding: 0.5rem;
-    border-radius: 16px;
-  }
+/* Tab styling */
+.content-scrollable :is([class*="tabs"], .supplier-tabs, .product-tabs, .tab-container) {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 1.5rem;
+  background: #ffffff;
+}
 
-  .detail-card {
-    border-radius: 14px;
-    padding: 1.25rem;
-    gap: 0.9rem;
+.content-scrollable :is(.tab-btn, [class*="tab-button"]) {
+  background: transparent;
+  border: none;
+  border-radius: 0 !important;
+  padding: 1rem 1.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  color: #6b7280;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+  margin-bottom: -1px;
+}
+
+.content-scrollable :is(.tab-btn.active, [class*="tab-button"].active) {
+  color: #111827;
+  font-weight: 600;
+  border-bottom-color: #111827;
+}
+
+@media (max-width: 768px) {
+  .content-scrollable :is(.detail-panel, [class*="detail-panel"]) {
+    border-radius: var(--workspace-radius-md);
+    padding: 1rem;
   }
 
   .detail-header {
     flex-direction: column;
-    align-items: flex-start;
-    padding-bottom: 0.75rem;
-  }
-
-  .detail-header h2,
-  .detail-title {
-    font-size: 1.25rem;
   }
 
   .detail-actions {
@@ -185,44 +222,17 @@
   .detail-actions button {
     flex: 1;
     justify-content: center;
-    padding: 0.6rem 1rem;
-    font-size: 0.875rem;
   }
 
-  .detail-grid,
-  .detail-item {
-    display: block;
+  .content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions {
+    justify-content: stretch;
+    padding: 1rem 0 0.5rem;
   }
 
-  .detail-item {
-    border-bottom: 1px solid #eceff5;
-  }
-
-  .detail-item label,
-  .detail-item .label,
-  .detail-item p,
-  .detail-item .value {
-    display: block;
-    border-right: none;
-    padding: 0.75rem 0.95rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .detail-card {
-    padding: 1rem;
-  }
-
-  .detail-header h2,
-  .detail-title {
-    font-size: 1.15rem;
-  }
-
-  .detail-actions {
-    flex-direction: column;
-  }
-
-  .detail-actions button {
+  .content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions button,
+  .content-scrollable :is(.detail-panel, [class*="detail-panel"]) .form-actions .btn {
+    flex: 1 1 auto;
     width: 100%;
+    justify-content: center;
   }
 }

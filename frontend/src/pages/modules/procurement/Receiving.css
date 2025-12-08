@@ -325,6 +325,31 @@
   animation: fadeIn 0.15s ease-out;
 }
 
+.mobile-scan-close {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0) + 0.75rem);
+  right: 0.75rem;
+  z-index: 1101;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  padding: 0.5rem;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #4b5563;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-scan-close:hover {
+  background: #f9fafb;
+  color: #111827;
+}
+
+.mobile-scan-close:active {
+  transform: scale(0.96);
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -1248,10 +1273,24 @@ button[style*="background: '#10b981'"]:hover:not(:disabled) {
 }
 
 /* Responsive Adjustments */
-@media (max-width: 768px) {
-.receiving-layout .modal-content {
-    max-height: 95vh;
-    border-radius: 0.75rem 0.75rem 0 0;
+@media (max-width: 900px) {
+.scan-modal-overlay {
+    padding: 0;
+    align-items: stretch;
+    background-color: #fff;
+    backdrop-filter: none;
+  }
+
+.scan-modal-overlay .modal-content.scan-modal {
+    max-height: none;
+    height: 100vh;
+    width: 100vw;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .mobile-scan-close {
+    display: inline-flex;
   }
   
   .modal-body {
@@ -1294,14 +1333,19 @@ button[style*="background: '#10b981'"]:hover:not(:disabled) {
 }
 
 @media (max-width: 480px) {
-  .modal-overlay {
+  .scan-modal-overlay {
     padding: 0;
+    background-color: #fff;
+    backdrop-filter: none;
   }
 
-  .modal-content {
+  .scan-modal-overlay .modal-content.scan-modal {
     max-width: 100%;
+    width: 100vw;
+    height: 100vh;
     border-radius: 0;
     max-height: 100vh;
+    box-shadow: none;
   }
 
   .scan-mode-btn {

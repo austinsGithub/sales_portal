@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import { Plus, Edit2, Trash2, Search, MapPin } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import './LocationGroups.css';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
@@ -15,14 +15,19 @@ const INITIAL_FORM = {
   state: ''
 };
 
+const PAGE_SIZE = 10;
+
 const LocationGroups = () => {
   const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(INITIAL_FORM);
   const [errorMessage, setErrorMessage] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [totalCount, setTotalCount] = useState(null);
 
   const fetchGroups = useCallback(async () => {
     try {
@@ -31,21 +36,45 @@ const LocationGroups = () => {
       const response = await axios.get(buildApiUrl('/api/inventory/location-groups'), {
         params: {
           q: searchQuery || undefined,
-          withCount: 'true'
+          withCount: 'true',
+          limit: PAGE_SIZE,
+          offset: offset
         }
       });
-      setGroups(response.data || []);
+
+      const data = response.data || [];
+
+      // Handle pagination metadata if provided
+      if (response.data && typeof response.data === 'object' && response.data.groups) {
+        setGroups(response.data.groups);
+        setTotalCount(response.data.total || null);
+      } else {
+        setGroups(data);
+        setTotalCount(null);
+      }
+
+      // Auto-select first group if none selected
+      setSelectedGroup(prev => {
+        const groupList = Array.isArray(data) ? data : (data.groups || []);
+        if (!groupList.length) return null;
+        if (!prev) return groupList[0];
+        return groupList.find(item => item.group_id === prev.group_id) || groupList[0];
+      });
     } catch (error) {
       console.error('Error fetching location groups:', error);
       setErrorMessage('Unable to load location groups. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, offset]);
 
   useEffect(() => {
     fetchGroups();
   }, [fetchGroups]);
+
+  useEffect(() => {
+    setOffset(0);
+  }, [searchQuery]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -103,6 +132,20 @@ const LocationGroups = () => {
     setFormData(INITIAL_FORM);
   };
 
+  const handlePrevPage = () => {
+    if (offset > 0) {
+      setOffset(prev => Math.max(0, prev - PAGE_SIZE));
+    }
+  };
+
+  const handleNextPage = () => {
+    setOffset(prev => prev + PAGE_SIZE);
+  };
+
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = totalCount ? Math.ceil(totalCount / PAGE_SIZE) : null;
+  const hasNextPage = totalCount ? offset + PAGE_SIZE < totalCount : groups.length === PAGE_SIZE;
+
   const renderGroups = () => {
     if (loading) {
       return <div className="loading-row">Loading location groups...</div>;
@@ -121,83 +164,147 @@ const LocationGroups = () => {
       );
     }
 
-    return (
-      <div className="groups-grid">
-        {groups.map(group => (
-          <article className="group-card" key={group.group_id}>
-            <div className="group-card-header">
-              <div>
-                <h3>{group.group_name}</h3>
-                {group.state && <span className="group-badge">{group.state}</span>}
-              </div>
-              <div className="group-card-actions">
-                <button type="button" className="ghost-btn" onClick={() => handleEdit(group)}>
-                  <Edit2 size={16} />
-                  Edit
-                </button>
-                <button type="button" className="ghost-btn danger" onClick={() => handleDelete(group.group_id)}>
-                  <Trash2 size={16} />
-                  Delete
-                </button>
-              </div>
-            </div>
-
-            {group.description && (
-              <p className="group-description">{group.description}</p>
-            )}
-
-            <div className="group-stats">
-              <div className="group-stat">
-                <MapPin size={16} />
-                <span>
-                  {group.location_count || 0} location{group.location_count === 1 ? '' : 's'}
-                </span>
-              </div>
-              <span className="group-created">
-                Created {group.created_at ? new Date(group.created_at).toLocaleDateString() : '—'}
-              </span>
-            </div>
-          </article>
-        ))}
+    return groups.map(group => (
+      <div
+        key={group.group_id}
+        className={`group-list-item${selectedGroup?.group_id === group.group_id ? ' selected' : ''}`}
+        onClick={() => setSelectedGroup(group)}
+      >
+        <div className="group-list-header">
+          <div className="group-list-title">
+            <span className="group-icon-small">
+              <MapPin size={16} />
+            </span>
+            <h3>{group.group_name}</h3>
+          </div>
+          <div className="group-list-actions">
+            <button
+              type="button"
+              className="action-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEdit(group);
+              }}
+            >
+              <Edit2 size={16} />
+            </button>
+            <button
+              type="button"
+              className="action-btn danger"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(group.group_id);
+              }}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+        <div className="group-list-meta">
+          <span className={`group-state-badge${group.state ? '' : ' neutral'}`}>
+            {group.state || 'No region'}
+          </span>
+          <span className="group-meta-divider">&bull;</span>
+          <span className="group-location-count">
+            {group.location_count || 0} location{group.location_count === 1 ? '' : 's'}
+          </span>
+        </div>
+        {group.description && (
+          <p className="group-list-description">{group.description}</p>
+        )}
+        <div className="group-list-footer">
+          <span className="group-created-date">
+            Created {group.created_at ? new Date(group.created_at).toLocaleDateString() : '-'}
+          </span>
+        </div>
       </div>
-    );
+    ));
   };
 
   return (
     <div className="location-groups-page">
-      <header className="groups-header">
-        <div>
-          <h1>Location Groups</h1>
-          <p>Segment your warehouses and docks by region, purpose, or ownership.</p>
-        </div>
-        <button type="button" className="primary-btn" onClick={openCreateModal}>
-          <Plus size={18} />
-          Add Location Group
-        </button>
-      </header>
+      <div className="location-groups-layout">
+        <div className="groups-list-panel">
+          <div className="list-panel-header">
+            <div className="header-top">
+              <div className="header-title">
+                <h2>Location Groups</h2>
+                <p className="header-subtitle">Segment your warehouses and docks by region, purpose, or ownership.</p>
+              </div>
+              <button type="button" className="add-group-btn" onClick={openCreateModal}>
+                <Plus size={18} />
+                Add Group
+              </button>
+            </div>
 
-      <div className="groups-toolbar">
-        <div className="group-search">
-          <Search className="search-icon" size={16} />
-          <input
-            type="text"
-            placeholder="Search by name, description, or state..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="search-input"
-          />
+            <div className="list-controls">
+              <div className="search-bar">
+                <Search className="search-icon" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search by name, description, or state..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="search-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="list-body">
+            {errorMessage && <div className="error-banner">{errorMessage}</div>}
+            {renderGroups()}
+          </div>
+
+          {!loading && groups.length > 0 && (
+            <div className="list-panel-footer">
+              <div className="pagination">
+                <button
+                  type="button"
+                  className="pagination-btn"
+                  onClick={handlePrevPage}
+                  disabled={offset === 0}
+                >
+                  <ChevronLeft size={16} />
+                  Previous
+                </button>
+                <span className="page-indicator">
+                  Page {currentPage}
+                  {totalPages && ` of ${totalPages}`}
+                  {totalCount && ` (${totalCount} total)`}
+                </span>
+                <button
+                  type="button"
+                  className="pagination-btn"
+                  onClick={handleNextPage}
+                  disabled={!hasNextPage}
+                >
+                  Next
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {errorMessage && <div className="error-banner">{errorMessage}</div>}
-
-      {renderGroups()}
-
       {showModal && (
-        <div className="modal-backdrop">
-          <div className="modal group-modal">
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeModal();
+          }}
+        >
+          <div
+            className="modal group-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="location-group-title"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
-              <h2>{editingGroup ? 'Edit Location Group' : 'Add Location Group'}</h2>
+              <h2 id="location-group-title">{editingGroup ? 'Edit Location Group' : 'Add Location Group'}</h2>
               <button type="button" className="icon-btn" onClick={closeModal} aria-label="Close">
                 ×
               </button>

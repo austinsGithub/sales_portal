@@ -1,33 +1,17 @@
 import React from 'react';
+import MobileModal from './ProductModalMobile.jsx';
 import './Locations.css';
 
 /**
- * MobileLocationModal
- * Full-screen modal for location details on mobile devices
+ * MobileLocationModal now reuses the shared mobile modal shell for consistency.
  */
-export default function MobileLocationModal({ open, onClose, title, children }) {
-  if (!open) return null;
-
+export default function MobileLocationModal({ title = 'Location', maxWidth = '100%', ...rest }) {
   return (
-    <div className="mobile-location-backdrop">
-      <div className="mobile-location-sheet">
-        {/* Header */}
-        <div className="mobile-location-header">
-          <h2 className="mobile-location-title">{title}</h2>
-          <button 
-            className="mobile-location-close" 
-            onClick={onClose}
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="mobile-location-body">
-          {children}
-        </div>
-      </div>
-    </div>
+    <MobileModal
+      title={title}
+      {...rest}
+      maxWidth={maxWidth}
+      allowBackdropClose={rest.allowBackdropClose ?? true}
+    />
   );
 }

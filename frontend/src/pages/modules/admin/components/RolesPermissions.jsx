@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import Toast from "../../../../shared/components/Toast.jsx";
 import "../../../../css/modules/admin/AdminSettings.css";
-import "../../../../css/modules/admin/UserManagement.css";
 import "../../../../css/modules/admin/Toast.css";
 
 function RolesPermissions() {
@@ -306,12 +305,13 @@ function RolesPermissions() {
     
     try {
       const token = localStorage.getItem("auth_token");
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/admin/roles`, {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/admin/roles`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
+        credentials: 'include',
         body: JSON.stringify(newRole)
       });
 

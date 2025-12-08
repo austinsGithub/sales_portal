@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../../shared/contexts/AuthContext';
-import { Plus, Send, X, Trash2, FileText, Search } from 'lucide-react';
+import { Plus, Send, X, Trash2, FileText, Search, ChevronDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import LineItems from './PurchaseOrderLineItems';
 import '../../../css/global/ListPanel.css';
@@ -26,6 +26,139 @@ const getAuthToken = () => {
   return token || '';
 };
 
+
+// Lightweight searchable dropdown for suppliers
+function SearchableSupplierSelect({ suppliers = [], value, onSelect, placeholder = 'Select supplier...', disabled }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const containerRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+
+  const filteredSuppliers = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return suppliers;
+    return suppliers.filter((s) =>
+      (s.supplier_name || '').toLowerCase().includes(term) ||
+      (s.supplier_code || '').toLowerCase().includes(term)
+    );
+  }, [query, suppliers]);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+        setQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = suppliers.find((s) => String(s.supplier_id) === String(value));
+
+  // Display selected supplier name or search query
+  const displayValue = open ? query : (selected ? `${selected.supplier_name}` : '');
+
+  const handleSelect = (supplierId) => {
+    onSelect(supplierId);
+    setQuery('');
+    setOpen(false);
+    inputRef.current?.blur();
+  };
+
+  return (
+    <div className="searchable-select" ref={containerRef}>
+      <div
+          className={`searchable-select-input-wrapper ${open ? 'is-open' : ''}`}
+          onClick={() => {
+            if (!disabled) {
+              inputRef.current?.focus();
+              setOpen(true);
+            }
+        }}
+      >
+        <Search size={14} className="search-icon" aria-hidden="true" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={displayValue}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            if (!open) setOpen(true);
+          }}
+          onFocus={() => {
+            setOpen(true);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setOpen(false);
+              setQuery('');
+              inputRef.current?.blur();
+            }
+          }}
+          placeholder={placeholder}
+          disabled={disabled}
+          aria-label="Search suppliers"
+          autoComplete="off"
+          spellCheck="false"
+        />
+        <ChevronDown
+          size={16}
+          className="chevron-icon"
+          aria-hidden="true"
+          style={{
+            color: '#9ca3af',
+            flexShrink: 0,
+            transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease'
+          }}
+        />
+      </div>
+
+      {open && (
+        <div className="searchable-select-panel">
+          <div className="searchable-select-header">Matching Suppliers</div>
+          <div className="searchable-select-list" role="listbox">
+            {filteredSuppliers.length === 0 ? (
+              <div className="searchable-select-empty">No matches found</div>
+            ) : (
+              filteredSuppliers.map((s) => {
+                const isActive = String(s.supplier_id) === String(value);
+                return (
+                  <button
+                    type="button"
+                    key={s.supplier_id}
+                    className={`searchable-select-row ${isActive ? 'is-active' : ''}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelect(s.supplier_id);
+                    }}
+                    role="option"
+                    aria-selected={isActive}
+                  >
+                    <div className="row-main">
+                      <div className="row-title">{s.supplier_name || 'Untitled supplier'}</div>
+                      {s.supplier_code && <span className="row-code">{s.supplier_code}</span>}
+                    </div>
+                    <div className="row-sub">{s.description || s.category || s.industry || '—'}</div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Hidden input for form validation */}
+      <input
+        type="hidden"
+        name="supplier_id"
+        value={value || ''}
+        required
+      />
+    </div>
+  );
+}
 
 // Add Purchase Order Modal
 function AddPurchaseOrderModal({ open, onClose, onCreated, authTokenStr }) {
@@ -180,6 +313,7 @@ function AddPurchaseOrderModal({ open, onClose, onCreated, authTokenStr }) {
 
   if (!shouldRender) return null;
 
+
   const change = (e) => {
     const { name, value } = e.target;
     const processedValue = (name === 'supplier_id' || name === 'ship_to_location_id')
@@ -285,19 +419,12 @@ function AddPurchaseOrderModal({ open, onClose, onCreated, authTokenStr }) {
 
         <form onSubmit={handleSubmit} className="modal-body grid-2">
           <label>Supplier *
-            <select
-              name="supplier_id"
+            <SearchableSupplierSelect
+              suppliers={suppliers}
               value={form.supplier_id}
-              onChange={change}
-              required
-            >
-              <option value="" disabled>Select supplier...</option>
-              {suppliers.map(s => (
-                <option key={s.supplier_id} value={s.supplier_id}>
-                  {s.supplier_name} {s.supplier_code && `(${s.supplier_code})`}
-                </option>
-              ))}
-            </select>
+              onSelect={(id) => setForm((prev) => ({ ...prev, supplier_id: id }))}
+              placeholder="Select supplier..."
+            />
           </label>
           <label>Ship To Location
             <select
@@ -706,19 +833,12 @@ function PurchaseOrderForm({ po, onCancel, onSave }) {
 
       <form onSubmit={handleSubmit} className="grid-2 gap-4">
         <label>Supplier *
-          <select
-            name="supplier_id"
+          <SearchableSupplierSelect
+            suppliers={suppliers}
             value={form.supplier_id}
-            onChange={change}
-            required
-          >
-            <option value="" disabled>Select supplier...</option>
-            {suppliers.map(s => (
-              <option key={s.supplier_id} value={s.supplier_id}>
-                {s.supplier_name} {s.supplier_code && `(${s.supplier_code})`}
-              </option>
-            ))}
-          </select>
+            onSelect={(id) => setForm((prev) => ({ ...prev, supplier_id: id }))}
+            placeholder="Select supplier..."
+          />
         </label>
         <label>Ship To Location
           <select
@@ -808,6 +928,7 @@ export default function PurchaseOrders() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [typing, setTyping] = useState('');
+  const [debouncedTyping, setDebouncedTyping] = useState('');
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
@@ -825,21 +946,20 @@ export default function PurchaseOrders() {
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-  const debouncedQuery = useMemo(() => {
-    const timerId = setTimeout(() => typing, 500);
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      setDebouncedTyping(typing.trim());
+      setOffset(0);
+    }, 300);
     return () => clearTimeout(timerId);
   }, [typing]);
-
-  useEffect(() => {
-    debouncedQuery();
-  }, [debouncedQuery]);
 
   const fetchPOs = async () => {
     setLoading(true);
     setErr('');
     try {
       const params = new URLSearchParams({
-        q: typing,
+        q: debouncedTyping,
         offset: String(offset),
         limit: String(PAGE_SIZE)
       });
@@ -871,7 +991,7 @@ export default function PurchaseOrders() {
 
   useEffect(() => {
     fetchPOs();
-  }, [offset, typing, statusFilter]);
+  }, [offset, debouncedTyping, statusFilter]);
 
   const fetchDetail = async (id) => {
     try {
@@ -1698,32 +1818,39 @@ export default function PurchaseOrders() {
               <h2>All Orders</h2>
               <p className="list-subtitle">{resultsLabel}</p>
             </div>
-            <div className="list-controls">
-              <div className="search-bar">
-                <Search size={16} className="search-icon" aria-hidden="true" />
-                <input
-                  type="text"
-                  placeholder="Search purchase orders..."
-                  value={typing}
-                  onChange={(e) => setTyping(e.target.value)}
-                />
-              </div>
-              <div className="filter-bar">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  aria-label="Filter by status"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="draft">Draft</option>
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="sent_to_supplier">Sent to Supplier</option>
-                  <option value="received">Received</option>
-                  <option value="cancelled">Cancelled</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-              </div>
+          </div>
+
+          <div className="list-controls">
+            <div className="search-bar">
+              <Search size={16} className="search-icon" aria-hidden="true" />
+              <input
+                type="text"
+                placeholder="Search purchase orders..."
+                value={typing}
+                onChange={(e) => {
+                  setTyping(e.target.value);
+                  setOffset(0);
+                }}
+              />
+            </div>
+            <div className="filter-bar">
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setOffset(0);
+                }}
+                aria-label="Filter by status"
+              >
+                <option value="">All Statuses</option>
+                <option value="draft">Draft</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="sent_to_supplier">Sent to Supplier</option>
+                <option value="received">Received</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="rejected">Rejected</option>
+              </select>
             </div>
           </div>
 
@@ -1833,6 +1960,7 @@ export default function PurchaseOrders() {
                   poId={selected.purchase_order_id}
                   status={selected.status}
                   lines={selected.lines || []}
+                  supplierId={selected.supplier_id}
                   onRefresh={() => fetchDetail(selected.purchase_order_id)}
                 />
               )}

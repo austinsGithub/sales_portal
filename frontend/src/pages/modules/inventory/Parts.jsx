@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Info } from 'lucide-react';
+import { Plus, Info, Search } from 'lucide-react';
 import './Parts.css';
 import PartInventory from './PartInventory.jsx';
+import PartCosts from './PartCosts.jsx';
 import useIsMobile from '../../../hooks/useIsMobile.js';
 import MobilePartModal from './PartModalMobile.jsx';
 import { useAuth } from '../../../shared/contexts/AuthContext.jsx';
@@ -64,45 +65,58 @@ const summarizeInventory = (items = []) => {
   };
 };
 
+const DEFAULT_PART_FORM = {
+  company_id: '',
+  product_name: '',
+  gtin: '',
+  description: '',
+  sku: '',
+  udi_code: '',
+  category: '',
+  subcategory: '',
+  supplier_id: '', // This will be set to the same as default_supplier_id
+  default_supplier_id: '',
+  preferred_bin_id: '',
+  lot_tracked: false,
+  serial_tracked: false,
+  expiration_required: false,
+  temperature_sensitive: false,
+  sterile_required: false,
+  regulatory_class: '',
+  reorder_point: 0,
+  reorder_quantity: 0,
+  unit_of_measure: '',
+  weight: 0,
+  dimensions: '',
+  is_active: true,
+  create_as_product: true, // Set to true by default
+};
+
 /* ------------------------- Add Part Modal ------------------------- */
 function AddPartModal({ open, onClose, onCreated, authTokenStr }) {
-  if (!open) return null;
-
-  const [form, setForm] = useState({
-    company_id: '',
-    product_name: '',
-    gtin: '',
-    description: '',
-    sku: '',
-    udi_code: '',
-    category: '',
-    subcategory: '',
-    supplier_id: '',  // This will be set to the same as default_supplier_id
-    default_supplier_id: '',
-    lot_tracked: false,
-    serial_tracked: false,
-    expiration_required: false,
-    temperature_sensitive: false,
-    sterile_required: false,
-    regulatory_class: '',
-    reorder_point: 0,
-    reorder_quantity: 0,
-    unit_of_measure: '',
-    weight: 0,
-    dimensions: '',
-    is_active: true,
-    create_as_product: true, // Set to true by default
-  });
+  const [form, setForm] = useState(DEFAULT_PART_FORM);
 
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState('');
   const [suppliers, setSuppliers] = useState([]);
+  const [bins, setBins] = useState([]);
 
-  // Fetch suppliers for dropdowns
+  // Reset form + errors when the modal opens so every session starts clean
   useEffect(() => {
+    if (!open) return;
+    setForm({ ...DEFAULT_PART_FORM });
+    setErr('');
+  }, [open]);
+
+  // Fetch suppliers for dropdowns (only when modal is open)
+  useEffect(() => {
+    if (!open) return;
+    const ctrl = new AbortController();
+
     const fetchSuppliers = async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/procurement/suppliers`, {
+          signal: ctrl.signal,
           headers: { Authorization: `Bearer ${authTokenStr}` },
         });
         if (!res.ok) throw new Error(`Failed to fetch suppliers: ${res.status}`);
@@ -110,11 +124,39 @@ function AddPartModal({ open, onClose, onCreated, authTokenStr }) {
         setSuppliers(data);
       } catch (e) {
         console.error('Error fetching suppliers', e);
-        setErr('Failed to load supplier list.');
+        if (e.name !== 'AbortError') {
+          setErr('Failed to load supplier list.');
+        }
       }
     };
     fetchSuppliers();
-  }, [authTokenStr]);
+    return () => ctrl.abort();
+  }, [authTokenStr, open]);
+
+  // Fetch bins for dropdowns (only when modal is open)
+  useEffect(() => {
+    if (!open) return;
+    const ctrl = new AbortController();
+
+    const fetchBins = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/inventory/bins`, {
+          signal: ctrl.signal,
+          headers: { Authorization: `Bearer ${authTokenStr}` },
+        });
+        if (!res.ok) throw new Error(`Failed to fetch bins: ${res.status}`);
+        const data = await res.json();
+        setBins(data);
+      } catch (e) {
+        console.error('Error fetching bins', e);
+        if (e.name !== 'AbortError') {
+          setErr('Failed to load bin list.');
+        }
+      }
+    };
+    fetchBins();
+    return () => ctrl.abort();
+  }, [authTokenStr, open]);
 
   const change = (e) => {
     const { name, value, type, checked } = e.target;
@@ -147,6 +189,7 @@ function AddPartModal({ open, onClose, onCreated, authTokenStr }) {
       ...form,
       // Remove supplier_id as it's not needed
       default_supplier_id: form.default_supplier_id ? Number(form.default_supplier_id) : null,
+      preferred_bin_id: form.preferred_bin_id ? Number(form.preferred_bin_id) : null,
       // Convert boolean values to 1/0 for the backend
       lot_tracked: form.lot_tracked ? 1 : 0,
       serial_tracked: form.serial_tracked ? 1 : 0,
@@ -218,6 +261,8 @@ function AddPartModal({ open, onClose, onCreated, authTokenStr }) {
     }
   };
 
+  if (!open) return null;
+
   return (
     <div className="modal-backdrop" role="presentation" onClick={onClose}>
       <div
@@ -257,6 +302,18 @@ function AddPartModal({ open, onClose, onCreated, authTokenStr }) {
                 <option value="">Select supplier</option>
                 {suppliers.map((s) => (
                   <option key={s.supplier_id} value={s.supplier_id}>{s.supplier_name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="col-span-2">Preferred Bin
+              <select name="preferred_bin_id" value={form.preferred_bin_id || ""} onChange={change}>
+                <option value="">No preferred bin</option>
+                {bins.map((b) => (
+                  <option key={b.bin_id} value={b.bin_id}>
+                    {b.location_name ? `${b.location_name} - ` : ''}
+                    {[b.aisle, b.rack, b.shelf, b.bin].filter(Boolean).join('-') || `Bin ${b.bin_id}`}
+                    {b.zone ? ` (${b.zone})` : ''}
+                  </option>
                 ))}
               </select>
             </label>
@@ -354,59 +411,72 @@ function AdvancedSearchModal({
   onApply,
 }) {
   if (!open) return null;
+
+  const handleChange = (field) => (e) => {
+    const value = e.target.value;
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onApply();
+  };
+
   return (
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
-      <div className="modal adv-modal" role="dialog" aria-modal="true" aria-labelledby="adv-search-title" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 id="adv-search-title">Advanced Search</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
+    <div className="filter-modal-backdrop" role="presentation" onClick={onClose}>
+      <div className="filter-modal" role="dialog" aria-modal="true" aria-labelledby="adv-search-title" onClick={(e) => e.stopPropagation()}>
+        <div className="filter-modal__header">
+          <h3 id="adv-search-title">Advanced Search</h3>
+          <button type="button" className="filter-modal__close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <div className="modal-body adv-grid">
-          <label>Category
-            <input value={filters.category} onChange={(e) => setFilters(f => ({ ...f, category: e.target.value }))} />
-          </label>
-          <label>Subcategory
-            <input value={filters.subcategory} onChange={(e) => setFilters(f => ({ ...f, subcategory: e.target.value }))} />
-          </label>
-          <label>Regulatory Class
-            <input value={filters.regulatory_class} onChange={(e) => setFilters(f => ({ ...f, regulatory_class: e.target.value }))} />
-          </label>
-          <label>Lot Tracked
-            <select value={filters.lot_tracked} onChange={(e) => setFilters(f => ({ ...f, lot_tracked: e.target.value }))}>
-              <option value="">Any</option>
-              <option value="1">Yes</option>
-              <option value="0">No</option>
-            </select>
-          </label>
-          <label>Serial Tracked
-            <select value={filters.serial_tracked} onChange={(e) => setFilters(f => ({ ...f, serial_tracked: e.target.value }))}>
-              <option value="">Any</option>
-              <option value="1">Yes</option>
-              <option value="0">No</option>
-            </select>
-          </label>
-          <label>Expiration Required
-            <select value={filters.expiration_required} onChange={(e) => setFilters(f => ({ ...f, expiration_required: e.target.value }))}>
-              <option value="">Any</option>
-              <option value="1">Yes</option>
-              <option value="0">No</option>
-            </select>
-          </label>
-          <label>Min Price
-            <input type="number" step="0.01" min="0" value={filters.min_unit_price} onChange={(e) => setFilters(f => ({ ...f, min_unit_price: e.target.value }))} />
-          </label>
-          <label>Max Price
-            <input type="number" step="0.01" min="0" value={filters.max_unit_price} onChange={(e) => setFilters(f => ({ ...f, max_unit_price: e.target.value }))} />
-          </label>
-          <label className="adv-inline">
+        <form className="filter-modal__body" onSubmit={handleSubmit}>
+          <div className="filter-modal__grid">
+            <label className="filter-field">Category
+              <input value={filters.category} onChange={handleChange('category')} />
+            </label>
+            <label className="filter-field">Subcategory
+              <input value={filters.subcategory} onChange={handleChange('subcategory')} />
+            </label>
+            <label className="filter-field">Regulatory Class
+              <input value={filters.regulatory_class} onChange={handleChange('regulatory_class')} />
+            </label>
+            <label className="filter-field">Lot Tracked
+              <select value={filters.lot_tracked} onChange={handleChange('lot_tracked')}>
+                <option value="">Any</option>
+                <option value="1">Yes</option>
+                <option value="0">No</option>
+              </select>
+            </label>
+            <label className="filter-field">Serial Tracked
+              <select value={filters.serial_tracked} onChange={handleChange('serial_tracked')}>
+                <option value="">Any</option>
+                <option value="1">Yes</option>
+                <option value="0">No</option>
+              </select>
+            </label>
+            <label className="filter-field">Expiration Required
+              <select value={filters.expiration_required} onChange={handleChange('expiration_required')}>
+                <option value="">Any</option>
+                <option value="1">Yes</option>
+                <option value="0">No</option>
+              </select>
+            </label>
+            <label className="filter-field">Min Price
+              <input type="number" step="0.01" min="0" value={filters.min_unit_price} onChange={handleChange('min_unit_price')} />
+            </label>
+            <label className="filter-field">Max Price
+              <input type="number" step="0.01" min="0" value={filters.max_unit_price} onChange={handleChange('max_unit_price')} />
+            </label>
+          </div>
+          <label className="filter-checkbox">
             <input type="checkbox" checked={includeInactive} onChange={(e) => setIncludeInactive(e.target.checked)} />
             Show deactivated parts
           </label>
-        </div>
-        <div className="modal-actions adv-actions">
-          <button className="cancel-btn" onClick={onClear}>Clear</button>
-          <button className="update-btn" onClick={onApply}>Apply</button>
-        </div>
+          <div className="filter-modal__actions">
+            <button type="button" className="filter-btn ghost" onClick={onClear}>Clear</button>
+            <button type="submit" className="filter-btn primary">Apply</button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -432,6 +502,8 @@ export default function Parts() {
   const [totalCount, setTotalCount] = useState(null);
   const [suppliers, setSuppliers] = useState([]);
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+  const [bins, setBins] = useState([]);
+  const [loadingBins, setLoadingBins] = useState(false);
   const [openAdd, setOpenAdd] = useState(false);
   const [openFilters, setOpenFilters] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -462,7 +534,7 @@ export default function Parts() {
       try {
         const authToken = token || getAuthToken();
         const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/procurement/suppliers`, {
-          headers: { 
+          headers: {
             'Authorization': `Bearer ${authToken}`,
             'Content-Type': 'application/json'
           },
@@ -476,9 +548,36 @@ export default function Parts() {
         setLoadingSuppliers(false);
       }
     };
-    
+
     if (token || getAuthToken()) {
       fetchSuppliers();
+    }
+  }, [token]);
+
+  // Fetch bins list for displaying bin information
+  useEffect(() => {
+    const fetchBins = async () => {
+      setLoadingBins(true);
+      try {
+        const authToken = token || getAuthToken();
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/inventory/bins`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          },
+        });
+        if (!res.ok) throw new Error(`Failed to fetch bins: ${res.status}`);
+        const data = await res.json();
+        setBins(data);
+      } catch (e) {
+        console.error('Error fetching bins', e);
+      } finally {
+        setLoadingBins(false);
+      }
+    };
+
+    if (token || getAuthToken()) {
+      fetchBins();
     }
   }, [token]);
 
@@ -698,13 +797,18 @@ export default function Parts() {
     onEdit,
     suppliers = [],
     loadingSuppliers,
+    bins = [],
+    loadingBins,
     mode = 'details',
     stockSummary,
     stockLoading,
     stockError,
   }) => {
-    const defaultSupplier = p.default_supplier_id 
+    const defaultSupplier = p.default_supplier_id
       ? suppliers.find(s => s.supplier_id === p.default_supplier_id)
+      : null;
+    const preferredBin = p.preferred_bin_id
+      ? bins.find(b => b.bin_id === p.preferred_bin_id)
       : null;
     const formatQuantity = (value) => {
       if (value === null || value === undefined) return '0';
@@ -720,6 +824,16 @@ export default function Parts() {
       { label: 'Created', value: p.created_at ? new Date(p.created_at).toLocaleDateString() : '—' }
     ];
 
+    const formatBinLocation = (bin) => {
+      if (!bin) return 'Not Assigned';
+      const parts = [];
+      if (bin.location_name) parts.push(bin.location_name);
+      const binCoords = [bin.aisle, bin.rack, bin.shelf, bin.bin].filter(Boolean).join('-');
+      if (binCoords) parts.push(binCoords);
+      if (bin.zone) parts.push(`(${bin.zone})`);
+      return parts.join(' ') || `Bin ${bin.bin_id}`;
+    };
+
     const detailFields = [
       { label: 'SKU', value: p.sku || 'N/A' },
       { label: 'GTIN', value: p.gtin || 'N/A' },
@@ -734,6 +848,12 @@ export default function Parts() {
           : defaultSupplier
           ? `${defaultSupplier.supplier_name}${defaultSupplier.email ? ` (${defaultSupplier.email})` : ''}`
           : 'No default supplier selected'
+      },
+      {
+        label: 'Preferred Bin',
+        value: loadingBins
+          ? 'Loading bins...'
+          : formatBinLocation(preferredBin)
       },
       { label: 'Regulatory Class', value: p.regulatory_class || 'N/A' },
       { label: 'Unit of Measure', value: p.unit_of_measure || 'EA' },
@@ -864,6 +984,7 @@ export default function Parts() {
       category: p.category || '',
       subcategory: p.subcategory || '',
       default_supplier_id: p.default_supplier_id ? String(p.default_supplier_id) : '',
+      preferred_bin_id: p.preferred_bin_id ? String(p.preferred_bin_id) : '',
       lot_tracked: Boolean(p.lot_tracked),
       serial_tracked: Boolean(p.serial_tracked),
       expiration_required: Boolean(p.expiration_required),
@@ -877,31 +998,49 @@ export default function Parts() {
       dimensions: p.dimensions || '',
       is_active: Boolean(p.is_active !== undefined ? p.is_active : true),
     });
-    
+
     const [formSuppliers, setFormSuppliers] = useState([]);
+    const [formBins, setFormBins] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // Fetch suppliers for dropdown
+    // Fetch suppliers and bins for dropdowns
     useEffect(() => {
-      const fetchSuppliers = async () => {
+      const fetchData = async () => {
         try {
           const authToken = token || getAuthToken();
-          const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/procurement/suppliers`, {
-            headers: { 
-              'Authorization': `Bearer ${authToken}`,
-              'Content-Type': 'application/json'
-            },
-          });
-          if (!res.ok) throw new Error(`Failed to fetch suppliers: ${res.status}`);
-          const data = await res.json();
-          setFormSuppliers(data);
+
+          const [suppliersRes, binsRes] = await Promise.all([
+            fetch(`${import.meta.env.VITE_API_BASE_URL}/api/procurement/suppliers`, {
+              headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+              },
+            }),
+            fetch(`${import.meta.env.VITE_API_BASE_URL}/api/inventory/bins`, {
+              headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json'
+              },
+            })
+          ]);
+
+          if (!suppliersRes.ok) throw new Error(`Failed to fetch suppliers: ${suppliersRes.status}`);
+          if (!binsRes.ok) throw new Error(`Failed to fetch bins: ${binsRes.status}`);
+
+          const [suppliersData, binsData] = await Promise.all([
+            suppliersRes.json(),
+            binsRes.json()
+          ]);
+
+          setFormSuppliers(suppliersData);
+          setFormBins(binsData);
         } catch (e) {
-          console.error('Error fetching suppliers', e);
+          console.error('Error fetching data', e);
         } finally {
           setLoading(false);
         }
       };
-      fetchSuppliers();
+      fetchData();
     }, [token]);
 
     const change = (e) => {
@@ -937,9 +1076,9 @@ export default function Parts() {
           </div>
           <div className="form-field">
             <label>Default Supplier</label>
-            <select 
-              name="default_supplier_id" 
-              value={form.default_supplier_id} 
+            <select
+              name="default_supplier_id"
+              value={form.default_supplier_id}
               onChange={change}
               className="w-full p-2 border rounded"
               disabled={loading}
@@ -948,6 +1087,25 @@ export default function Parts() {
               {formSuppliers.map((supplier) => (
                 <option key={supplier.supplier_id} value={supplier.supplier_id}>
                   {supplier.supplier_name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-field">
+            <label>Preferred Bin</label>
+            <select
+              name="preferred_bin_id"
+              value={form.preferred_bin_id}
+              onChange={change}
+              className="w-full p-2 border rounded"
+              disabled={loading}
+            >
+              <option value="">No preferred bin</option>
+              {formBins.map((bin) => (
+                <option key={bin.bin_id} value={bin.bin_id}>
+                  {bin.location_name ? `${bin.location_name} - ` : ''}
+                  {[bin.aisle, bin.rack, bin.shelf, bin.bin].filter(Boolean).join('-') || `Bin ${bin.bin_id}`}
+                  {bin.zone ? ` (${bin.zone})` : ''}
                 </option>
               ))}
             </select>
@@ -1028,6 +1186,7 @@ export default function Parts() {
                 category: form.category || null,
                 subcategory: form.subcategory || null,
                 default_supplier_id: form.default_supplier_id ? Number(form.default_supplier_id) : null,
+                preferred_bin_id: form.preferred_bin_id ? Number(form.preferred_bin_id) : null,
                 lot_tracked: form.lot_tracked ? 1 : 0,
                 serial_tracked: form.serial_tracked ? 1 : 0,
                 expiration_required: form.expiration_required ? 1 : 0,
@@ -1066,26 +1225,27 @@ export default function Parts() {
   /* --------------------------------- UI --------------------------------- */
   return (
     <div className="parts-layout">
-      <div className="part-list-panel">
-        <div className="list-panel-header">
+      <div className="part-list-panel list-panel" style={{ height: '100%', alignSelf: 'stretch' }}>
+        <div className="list-panel-header part-list-header">
           <h1>Parts</h1>
-          <div className="list-panel-actions">
+          <div className="list-controls">
+            <div className="search-bar">
+              <Search size={16} className="search-icon" aria-hidden="true" />
+              <input
+                type="text"
+                placeholder="Search parts..."
+                value={typing}
+                onChange={(e) => setTyping(e.target.value)}
+              />
+            </div>
             <button className="filters-btn" onClick={() => setOpenFilters(true)}>Filters</button>
             {includeInactive && <span className="filter-chip">Including deactivated</span>}
-          </div>
-          <div className="search-bar">
-            <input
-              type="text"
-              placeholder="Search parts..."
-              value={typing}
-              onChange={(e) => setTyping(e.target.value)}
-            />
           </div>
         </div>
 
         {err && <div className="error-banner">Error: {err}</div>}
 
-        <div className="part-list">
+        <div className="part-list list-body">
           {parts.map(p => (
             <ListItem
               key={p.part_id}
@@ -1152,6 +1312,12 @@ export default function Parts() {
             >
               Inventory
             </button>
+            <button
+              className={`tab-btn ${activeTab === 'costs' ? 'active' : ''}` }
+              onClick={() => setActiveTab('costs')}
+            >
+              Costs
+            </button>
           </div>
 
           {selected && activeTab === 'general' && (
@@ -1167,6 +1333,8 @@ export default function Parts() {
                 onEdit={() => setIsEditingGeneral(true)}
                 suppliers={suppliers}
                 loadingSuppliers={loadingSuppliers}
+                bins={bins}
+                loadingBins={loadingBins}
                 mode="summary"
                 stockSummary={stockSummary}
                 stockLoading={stockLoading}
@@ -1199,11 +1367,20 @@ export default function Parts() {
               authToken={token || getAuthToken()}
             />
           )}
+
+          {selected && activeTab === 'costs' && (
+            <PartCosts
+              partId={selected.part_id}
+              authToken={token || getAuthToken()}
+            />
+          )}
         </MobilePartModal>
       ) : (
-        <div className="part-detail-panel">
+        <div className="part-detail-panel detail-panel" style={{ height: '100%', alignSelf: 'stretch' }}>
           {!selected ? (
-            <p>Select a part to see details.</p>
+            <div className="detail-empty-state part-empty-state">
+              <p>Select a part to see details.</p>
+            </div>
           ) : (
             <>
               <div className="part-tabs">
@@ -1225,6 +1402,12 @@ export default function Parts() {
                 >
                   Inventory
                 </button>
+                <button
+                  className={`tab-btn ${activeTab === 'costs' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('costs')}
+                >
+                  Costs
+                </button>
               </div>
 
               {activeTab === 'general' && (
@@ -1240,6 +1423,8 @@ export default function Parts() {
                 onEdit={() => setIsEditingGeneral(true)}
                 suppliers={suppliers}
                 loadingSuppliers={loadingSuppliers}
+                bins={bins}
+                loadingBins={loadingBins}
                 mode="summary"
                 stockSummary={stockSummary}
                 stockLoading={stockLoading}
@@ -1261,6 +1446,8 @@ export default function Parts() {
                     onEdit={() => setIsEditingDetails(true)}
                     suppliers={suppliers}
                     loadingSuppliers={loadingSuppliers}
+                    bins={bins}
+                    loadingBins={loadingBins}
                     mode="details"
                   />
                 )
@@ -1268,6 +1455,13 @@ export default function Parts() {
 
               {activeTab === 'inventory' && selected && (
                 <PartInventory
+                  partId={selected.part_id}
+                  authToken={token || getAuthToken()}
+                />
+              )}
+
+              {activeTab === 'costs' && selected && (
+                <PartCosts
                   partId={selected.part_id}
                   authToken={token || getAuthToken()}
                 />

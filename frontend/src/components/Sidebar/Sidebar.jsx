@@ -56,13 +56,18 @@ const Sidebar = ({
             'inventory.inventory.export'
           ]
         },
-        { 
-          to: '/inventory/products', 
+        {
+          to: '/inventory/products',
           label: 'Products',
           permissions: ['inventory.products.view', 'inventory.products.manage']
         },
-        { 
-          to: '/inventory/parts', 
+        {
+          to: '/inventory/product-categories',
+          label: 'Product Categories',
+          permissions: ['inventory.products.view', 'inventory.products.manage']
+        },
+        {
+          to: '/inventory/parts',
           label: 'Parts',
           permissions: ['inventory.parts.view', 'inventory.parts.manage']
         },
@@ -86,6 +91,11 @@ const Sidebar = ({
           to: '/inventory/locations',
           label: 'Locations',
           permissions: ['inventory.locations.view', 'inventory.locations.manage']
+        },
+        {
+          to: '/inventory/bins',
+          label: 'Bins',
+          permissions: ['inventory.bins.view', 'inventory.inventory.view']
         },
         {
           to: '/inventory/location-groups',
@@ -304,6 +314,10 @@ const Sidebar = ({
   // Check if current path matches a menu item
   const isActive = (path) => {
     if (!path) return false;
+    // Avoid making the inventory root look active for every deeper inventory route
+    if (path === '/inventory') {
+      return location.pathname === path;
+    }
     return location.pathname === path || location.pathname.startsWith(`${path}/`);
   };
 

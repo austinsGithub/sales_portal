@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { 
-  Users, 
-  Building, 
-  Shield, 
-  CreditCard, 
-  Settings, 
-  ChevronRight 
+import {
+  Users,
+  Building,
+  Shield,
+  CreditCard,
+  Settings,
+  ChevronRight
 } from 'lucide-react';
-import UserManagementAPI from './components/UserManagementAPI';
+import UsersPage from './Users';
 import RolesPermissions from './components/RolesPermissions.jsx';
 import Companies from './components/Companies.jsx';
 import "../../../css/modules/admin/AdminSettings.css";
@@ -44,7 +44,7 @@ const adminNavItems = [
 
 // Maps tab IDs to their corresponding components for cleaner rendering
 const componentMap = {
-  users: <UserManagementAPI />,
+  users: <UsersPage />,
   roles: <RolesPermissions />,
   companies: <Companies />,
 };

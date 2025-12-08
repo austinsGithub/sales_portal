@@ -1,4 +1,4 @@
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../shared/contexts/AuthContext';
 
 /**
  * Custom hook for permission-based UI rendering

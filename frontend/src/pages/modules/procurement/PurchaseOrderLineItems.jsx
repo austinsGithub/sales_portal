@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Edit, X, Check, AlertCircle } from 'lucide-react';
 import './PurchaseOrderLineItems.css';
 
@@ -15,7 +15,7 @@ const getAuthToken = () => {
   return token || '';
 };
 
-const LineItems = ({ poId, status, lines = [], onRefresh }) => {
+const LineItems = ({ poId, status, lines = [], supplierId, onRefresh }) => {
   const [editingLine, setEditingLine] = useState(null);
   const [formData, setFormData] = useState({
     part_id: '',
@@ -26,6 +26,7 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
   const [parts, setParts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const latestCostRequest = useRef('');
 
   // Load parts for dropdown
   useEffect(() => {
@@ -73,6 +74,82 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
     fetchParts();
   }, []);
 
+  // Fetch supplier-specific cost when part or supplier changes (e.g., when opening editor)
+  useEffect(() => {
+    if (formData.part_id && supplierId) {
+      fetchSupplierCost(formData.part_id);
+    }
+  }, [formData.part_id, supplierId]);
+
+  const fetchSupplierCost = async (partId) => {
+    if (!partId || !supplierId) return;
+
+    const requestKey = `${partId}-${supplierId}`;
+    latestCostRequest.current = requestKey;
+
+    const tryApplyCost = (rows) => {
+      if (!rows || !rows.length) return false;
+      const matches = rows.filter((row) => Number(row.supplier_id) === Number(supplierId));
+      if (!matches.length) return false;
+
+      const latest = [...matches].sort((a, b) => {
+        const aDate = a.effective_date ? new Date(a.effective_date).getTime() : 0;
+        const bDate = b.effective_date ? new Date(b.effective_date).getTime() : 0;
+        return bDate - aDate;
+      })[0];
+
+      if (latestCostRequest.current !== requestKey) return true; // request superseded, treat as handled
+
+      if (latest?.unit_cost != null) {
+        const normalizedCost = parseFloat(String(latest.unit_cost).replace(/[^0-9.-]/g, ''));
+        if (!Number.isNaN(normalizedCost)) {
+          const formatted = normalizedCost.toFixed(2);
+          setFormData((prev) => ({
+            ...prev,
+            unit_price: formatted,
+            unit_cost: formatted,
+          }));
+          return true;
+        }
+      }
+      return false;
+    };
+
+    try {
+      // First try: by part
+      const byPartRes = await fetch(buildApiUrl(`api/procurement/part-costs/by-part/${partId}`), {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (byPartRes.ok) {
+        const data = await byPartRes.json();
+        const rows = Array.isArray(data) ? data : (data.data || []);
+        if (tryApplyCost(rows)) return;
+      }
+
+      // Fallback: by supplier (in case backend filtering differs)
+      const bySupplierRes = await fetch(buildApiUrl(`api/procurement/part-costs/by-supplier/${supplierId}`), {
+        headers: {
+          'Authorization': `Bearer ${getAuthToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (bySupplierRes.ok) {
+        const data = await bySupplierRes.json();
+        const rows = Array.isArray(data) ? data : (data.data || []);
+        const filtered = rows.filter((r) => {
+          const rp = r.part_id != null ? r.part_id.toString() : '';
+          return rp === partId.toString() || Number(r.part_id) === Number(partId);
+        });
+        tryApplyCost(filtered);
+      }
+    } catch (err) {
+      console.error('Error fetching supplier cost', err);
+    }
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -83,14 +160,18 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
     // If part is selected, try to auto-fill the unit cost
     if (name === 'part_id' && value) {
       const selectedPart = parts.find(p => p.id.toString() === value);
-      // Note: Your part mapping doesn't include unit_cost.
-      // If it did (e.g., from part.unit_cost), this would work.
+      // Immediately seed with part's base unit_cost if present while supplier cost loads
       if (selectedPart && selectedPart.unit_cost) {
-        setFormData(prev => ({
-          ...prev,
-          unit_cost: selectedPart.unit_cost.toString()
-        }));
+        const seeded = Number(selectedPart.unit_cost);
+        if (!Number.isNaN(seeded)) {
+          setFormData(prev => ({
+            ...prev,
+            unit_price: seeded.toFixed(2),
+            unit_cost: seeded.toFixed(2),
+          }));
+        }
       }
+      fetchSupplierCost(value);
     }
   };
 
@@ -105,6 +186,9 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
       unit_cost: (line.unit_cost || line.unit_price || 0).toString(),
       notes: line.notes || ''
     });
+    if (line.part_id) {
+      fetchSupplierCost(line.part_id);
+    }
   };
 
   const handleCancelEdit = () => {
@@ -114,6 +198,7 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
       part_name: '',
       quantity_ordered: '1',
       unit_price: '0.00',
+      unit_cost: '0.00',
       notes: ''
     });
     setError(''); // Clear error on cancel
@@ -156,12 +241,12 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
         purchase_order_id: purchaseOrderId,
         part_id: parseInt(formData.part_id),
         quantity_ordered: parseInt(formData.quantity_ordered) || 1,
-        unit_cost: parseFloat(formData.unit_price) || 0,
+        unit_cost: parseFloat(formData.unit_price || formData.unit_cost) || 0,
         notes: formData.notes || ''
       };
       
       // For backward compatibility, include unit_price if it's different from unit_cost
-      if (parseFloat(formData.unit_price) !== parseFloat(formData.unit_cost || 0)) {
+      if (parseFloat(formData.unit_price || 0) !== parseFloat(formData.unit_cost || formData.unit_price || 0)) {
         payload.unit_price = parseFloat(formData.unit_price) || 0;
       }
       
@@ -241,7 +326,8 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
                 part_id: '',
                 quantity_ordered: '1',
                 unit_price: '0.00',
-                line_notes: ''
+                unit_cost: '0.00',
+                notes: ''
               });
             }}
             className="btn btn-primary"
@@ -301,7 +387,7 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
               />
             </div>
             <div>
-              <label htmlFor="unit_price">Unit Price</label>
+              <label htmlFor="unit_price">Unit Cost</label>
               <div className="price-input-wrapper">
                 <span className="price-input-prefix">$</span>
                 <input
@@ -320,11 +406,11 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
             </div>
           </div>
           <div className="mt-4">
-            <label htmlFor="line_notes">Notes</label>
+            <label htmlFor="notes">Notes</label>
             <textarea
-              id="line_notes"
-              name="line_notes"
-              value={formData.line_notes}
+              id="notes"
+              name="notes"
+              value={formData.notes}
               onChange={handleInputChange}
               rows={2}
               placeholder="Optional notes about this line item"
@@ -358,7 +444,7 @@ const LineItems = ({ poId, status, lines = [], onRefresh }) => {
               <th>Part</th>
               <th>Description</th>
               <th className="numeric">Qty</th>
-              <th className="numeric">Unit Price</th>
+              <th className="numeric">Unit Cost</th>
               <th className="numeric">Total</th>
               {status === 'draft' && <th>Actions</th>}
             </tr>

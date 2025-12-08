@@ -26,14 +26,6 @@ const INVENTORY_PAGE_SIZE = 20;
 
 const numberFormatter = new Intl.NumberFormat('en-US');
 
-const defaultInventorySummary = {
-  totalQuantityOnHand: 0,
-  totalQuantityAvailable: 0,
-  totalQuantityReserved: 0,
-  uniquePartCount: 0,
-  uniqueSkuCount: 0
-};
-
 const formatNumberValue = (value) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return '0';
@@ -62,34 +54,6 @@ const DETAIL_TABS = [
   { id: 'inventory', label: 'Inventory' }
 ];
 
-const buildSummaryFromItems = (items = []) => {
-  const totals = {
-    totalQuantityOnHand: 0,
-    totalQuantityAvailable: 0,
-    totalQuantityReserved: 0
-  };
-
-  const uniqueSkus = new Set();
-  const uniqueParts = new Set();
-
-  items.forEach(item => {
-    totals.totalQuantityOnHand += Number(item.quantity_on_hand) || 0;
-    totals.totalQuantityAvailable += Number(item.quantity_available) || 0;
-    totals.totalQuantityReserved += Number(item.quantity_reserved) || 0;
-
-    if (item.sku) uniqueSkus.add(item.sku);
-    if (item.part_id) uniqueParts.add(item.part_id);
-  });
-
-  return {
-    totalQuantityOnHand: totals.totalQuantityOnHand,
-    totalQuantityAvailable: totals.totalQuantityAvailable,
-    totalQuantityReserved: totals.totalQuantityReserved,
-    uniqueSkuCount: uniqueSkus.size,
-    uniquePartCount: uniqueParts.size
-  };
-};
-
 function useDebouncedValue(value, delay = 350) {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -103,13 +67,10 @@ function useDebouncedValue(value, delay = 350) {
 
 const LOCATION_TYPE_OPTIONS = [
   { value: '', label: 'Select a type' },
-  { value: 'corporate_warehouse', label: 'Corporate Warehouse' },
-  { value: 'distribution_center', label: 'Distribution Center' },
-  { value: 'ship_to', label: 'Ship To Address' },
-  { value: 'manufacturing', label: 'Manufacturing Plant' },
-  { value: 'retail', label: 'Retail / Showroom' },
-  { value: 'office', label: 'Corporate Office' },
-  { value: 'other', label: 'Other' }
+  { value: 'warehouse', label: 'Warehouse' },
+  { value: 'facility', label: 'Facility' },
+  { value: 'residential', label: 'Residential' },
+  { value: 'distributorship', label: 'Distributorship' }
 ];
 
 const getLocationTypeLabel = (value) => {
@@ -134,7 +95,6 @@ const Locations = () => {
   const [totalCount, setTotalCount] = useState(null);
   const [inventorySearch, setInventorySearch] = useState('');
   const [inventoryData, setInventoryData] = useState([]);
-  const [inventorySummary, setInventorySummary] = useState(null);
   const [inventoryTotal, setInventoryTotal] = useState(0);
   const [inventoryOffset, setInventoryOffset] = useState(0);
   const [inventoryLoading, setInventoryLoading] = useState(false);
@@ -144,16 +104,12 @@ const Locations = () => {
   const selectedLocationId = selectedLocation?.location_id;
   const debouncedInventorySearch = useDebouncedValue(inventorySearch, 400);
 
-  const applyInventoryResponse = useCallback((payload, { deriveSummaryFromItems = false } = {}) => {
+  const applyInventoryResponse = useCallback((payload) => {
     const rawItems = payload?.items ?? payload?.data ?? payload?.rows ?? [];
     const normalizedItems = Array.isArray(rawItems) ? rawItems : [];
     const parsedTotal = Number(payload?.total ?? payload?.count);
-    const summary = deriveSummaryFromItems || !payload?.summary
-      ? buildSummaryFromItems(normalizedItems)
-      : { ...defaultInventorySummary, ...payload.summary };
 
     setInventoryData(normalizedItems);
-    setInventorySummary(summary);
     setInventoryTotal(Number.isFinite(parsedTotal) ? parsedTotal : normalizedItems.length);
     setInventoryError(null);
   }, []);
@@ -198,7 +154,6 @@ const Locations = () => {
   const loadLocationInventory = useCallback(async () => {
     if (!selectedLocationId) {
       setInventoryData([]);
-      setInventorySummary(null);
       setInventoryTotal(0);
       setInventoryError(null);
       setInventoryLoading(false);
@@ -234,11 +189,10 @@ const Locations = () => {
           }
         );
 
-        applyInventoryResponse(fallbackResponse.data || {}, { deriveSummaryFromItems: true });
+        applyInventoryResponse(fallbackResponse.data || {});
       } catch (fallbackError) {
         console.error('Fallback inventory fetch failed:', fallbackError);
         setInventoryData([]);
-        setInventorySummary(null);
         setInventoryTotal(0);
         setInventoryError('Unable to load inventory for this location right now.');
       }
@@ -455,22 +409,10 @@ const Locations = () => {
       return null;
     }
 
-    const summary = inventorySummary
-      ? { ...defaultInventorySummary, ...inventorySummary }
-      : defaultInventorySummary;
-
     const totalPages = Math.max(Math.ceil((inventoryTotal || 0) / INVENTORY_PAGE_SIZE), 1);
     const currentPage = Math.min(totalPages, Math.floor(inventoryOffset / INVENTORY_PAGE_SIZE) + 1);
     const hasPrevInventory = inventoryOffset > 0;
     const hasNextInventory = inventoryOffset + INVENTORY_PAGE_SIZE < inventoryTotal;
-
-    const summaryMetrics = [
-      { label: 'Available', value: formatNumberValue(summary.totalQuantityAvailable) },
-      { label: 'On Hand', value: formatNumberValue(summary.totalQuantityOnHand) },
-      { label: 'Reserved', value: formatNumberValue(summary.totalQuantityReserved) },
-      { label: 'Unique SKUs', value: formatNumberValue(summary.uniqueSkuCount) },
-      { label: 'Unique Parts', value: formatNumberValue(summary.uniquePartCount) }
-    ];
 
     return (
       <div className="location-inventory-section">
@@ -486,22 +428,13 @@ const Locations = () => {
 
         <div className="inventory-toolbar">
           <div className="inventory-search">
-            
+            <Search className="inventory-search-icon" size={16} />
             <input
               type="text"
               placeholder="Search SKU, supplier, lot, serial..."
               value={inventorySearch}
               onChange={(event) => setInventorySearch(event.target.value)}
             />
-          </div>
-
-          <div className="inventory-summary-grid">
-            {summaryMetrics.map(metric => (
-              <div className="inventory-summary-tile" key={metric.label}>
-                <p className="label">{metric.label}</p>
-                <p className="value">{metric.value}</p>
-              </div>
-            ))}
           </div>
         </div>
 
@@ -690,25 +623,27 @@ const Locations = () => {
         </div>
       </section>
 
-      <section className="detail-panel location-detail-panel">
-        <div className="detail-card location-detail-content">
-          <div className="detail-tabs">
-            {DETAIL_TABS.map(tab => (
-              <button
-                key={tab.id}
-                type="button"
-                className={`detail-tab-btn ${activeDetailTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveDetailTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {!isMobile && (
+        <section className="detail-panel location-detail-panel">
+          <div className="detail-card location-detail-content">
+            <div className="detail-tabs">
+              {DETAIL_TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  className={`detail-tab-btn ${activeDetailTab === tab.id ? 'active' : ''}`}
+                  onClick={() => setActiveDetailTab(tab.id)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
 
-          {activeDetailTab === 'details' && renderLocationDetails(selectedLocation)}
-          {activeDetailTab === 'inventory' && renderInventorySection()}
-        </div>
-      </section>
+            {activeDetailTab === 'details' && renderLocationDetails(selectedLocation)}
+            {activeDetailTab === 'inventory' && renderInventorySection()}
+          </div>
+        </section>
+      )}
 
       {showModal && (
         <div className="modal-backdrop">

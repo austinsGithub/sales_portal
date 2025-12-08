@@ -4,6 +4,7 @@ import {
   Box,
   Calendar,
   ClipboardList,
+  Info,
   MapPin,
   Package,
   Plus,
@@ -57,6 +58,8 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     from_location_id: '',
     to_location_id: '',
+    destination_type: 'general_delivery',
+    destination_loadout_id: '',
     blueprint_id: '',
     priority: 'Medium',
     requested_date: '',
@@ -65,14 +68,14 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
   });
   const [locations, setLocations] = useState([]);
   const [blueprints, setBlueprints] = useState([]);
-  const [blueprintDetails, setBlueprintDetails] = useState(null);
+  const [blueprintDetails, setBlueprintDetails] = useState([]);
+  const [destinationLoadouts, setDestinationLoadouts] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
   const [selectedItems, setSelectedItems] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [products, setProducts] = useState([]);
-  const [productSearch, setProductSearch] = useState('');
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showDestinationTypeInfo, setShowDestinationTypeInfo] = useState(false);
 
   const getAuthHeaders = () => {
     const stored =
@@ -87,14 +90,24 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
   useEffect(() => {
     fetchLocations();
     fetchBlueprints();
-    fetchProducts();
   }, []);
 
   useEffect(() => {
     if (formData.from_location_id) {
+      setInventoryItems([]);
+      setSelectedItems([]);
+      setSearchTerm('');
       fetchInventory();
     }
   }, [formData.from_location_id]);
+
+  useEffect(() => {
+    if (formData.to_location_id) {
+      fetchDestinationLoadouts(formData.to_location_id);
+    } else {
+      setDestinationLoadouts([]);
+    }
+  }, [formData.to_location_id]);
 
   useEffect(() => {
     if (formData.blueprint_id) {
@@ -130,28 +143,11 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
     }
   };
 
-  const fetchProducts = async () => {
-    try {
-      const res = await axios.get(`${API_BASE}/api/inventory/products`, {
-        params: { limit: 250, offset: 0 },
-        headers: getAuthHeaders()
-      });
-      const rows = Array.isArray(res.data)
-        ? res.data
-        : Array.isArray(res.data?.data)
-        ? res.data.data
-        : res.data?.rows || [];
-      setProducts(rows);
-    } catch (err) {
-      console.error('Failed to load products', err);
-    }
-  };
-
   const fetchInventory = async () => {
     if (!formData.from_location_id) return;
     try {
-      const res = await axios.get(`${API_BASE}/api/inventory/items`, {
-        params: { locationId: formData.from_location_id, limit: 400 },
+      const res = await axios.get(`${API_BASE}/api/inventory/items/by-location/${formData.from_location_id}`, {
+        params: { limit: 400 },
         headers: getAuthHeaders()
       });
       const items = Array.isArray(res.data)
@@ -159,9 +155,42 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
         : Array.isArray(res.data?.items)
         ? res.data.items
         : res.data?.data || [];
-      setInventoryItems(items.map(normalizeInventoryRecord));
+      const fromId = Number(formData.from_location_id);
+      const scopedItems = Number.isFinite(fromId)
+        ? items.filter((item) => Number(item.location_id) === fromId)
+        : [];
+      const availableOnly = scopedItems.filter((item) => {
+        let computed = Number(
+          item.computed_available ??
+          item.quantity_available ??
+          item.quantity_on_hand
+        );
+        if (!Number.isFinite(computed)) computed = 0;
+        const reserved = Number(item.quantity_reserved ?? 0);
+        const net = computed > 0 ? computed : computed - reserved;
+        return net > 0;
+      });
+      setInventoryItems(availableOnly.map(normalizeInventoryRecord));
     } catch (err) {
       console.error('Failed to load inventory', err);
+    }
+  };
+
+  const fetchDestinationLoadouts = async (locationId) => {
+    if (!locationId) {
+      setDestinationLoadouts([]);
+      return;
+    }
+    try {
+      const res = await axios.get(`${API_BASE}/api/inventory/container_loadouts/search`, {
+        params: { locationId, company_id: 1 },
+        headers: getAuthHeaders()
+      });
+      const rows = Array.isArray(res.data) ? res.data : res.data?.rows || [];
+      setDestinationLoadouts(rows);
+    } catch (err) {
+      console.error('Failed to load destination loadouts', err);
+      setDestinationLoadouts([]);
     }
   };
 
@@ -188,10 +217,23 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
 
   const handleInputChange = (event) => {
     const { name, value } = event.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      // Reset destination_loadout_id if switching to general_delivery
+      if (name === 'destination_type' && value === 'general_delivery') {
+        updated.destination_loadout_id = '';
+      }
+      return updated;
+    });
   };
 
   const handleAddInventoryItem = (record) => {
+    const fromId = Number(formData.from_location_id);
+    if (!fromId || Number(record.location_id) !== fromId) {
+      alert('Select a source location before choosing inventory. Items must come from the origin.');
+      return;
+    }
+
     const exists = selectedItems.some((item) => item.inventory_id === record.inventory_id);
     if (exists) return;
 
@@ -205,6 +247,7 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
         unit_of_measure: record.part?.unit_of_measure || 'EA',
         serial_number: record.serial_number || null,
         expiration_date: record.lot?.expiration_date || null,
+        location_id: record.location_id,
         part: record.part,
         lot: record.lot
       }
@@ -222,104 +265,24 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
   };
 
   const filteredInventory = useMemo(() => {
-    if (!searchTerm) return inventoryItems;
+    const fromId = Number(formData.from_location_id);
+    const locationFiltered = Number.isFinite(fromId)
+      ? inventoryItems.filter((item) => Number(item.location_id) === fromId)
+      : [];
+    if (!searchTerm) return locationFiltered;
     const term = searchTerm.toLowerCase();
-    return inventoryItems.filter((item) =>
+    return locationFiltered.filter((item) =>
       [item.part?.product_name, item.part?.sku, item.lot?.lot_number]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(term))
     );
-  }, [inventoryItems, searchTerm]);
+  }, [inventoryItems, searchTerm, formData.from_location_id]);
 
   const manualStats = useMemo(() => {
     const totalQty = selectedItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
     const uniqueParts = new Set(selectedItems.map((item) => item.part_id)).size;
     return { totalQty, uniqueParts };
   }, [selectedItems]);
-
-  const addProductViaInventory = (product) => {
-    if (!formData.from_location_id) {
-      alert('Select a source location first to add items.');
-      return;
-    }
-    const inventoryMatch = inventoryItems.find(
-      (item) => String(item.part_id) === String(product.part_id)
-    );
-    if (!inventoryMatch) {
-      alert('No inventory available for this product at the selected location.');
-      return;
-    }
-    handleAddInventoryItem(inventoryMatch);
-  };
-
-  const filteredProducts = useMemo(() => {
-    const term = productSearch.trim().toLowerCase();
-    if (!term) return [];
-    return products
-      .filter((product) => {
-        return [product.product_name, product.public_sku]
-          .filter(Boolean)
-          .some((value) => value.toLowerCase().includes(term));
-      })
-      .slice(0, 8);
-  }, [productSearch, products]);
-
-  const renderProductLookup = () => (
-    <div className="cto-product-search">
-      <div className="cto-field">
-        <label>
-          <Search size={16} />
-          Search products
-        </label>
-        <input
-          placeholder="Search catalog by product name or SKU"
-          value={productSearch}
-          onChange={(e) => setProductSearch(e.target.value)}
-        />
-        <small>Products share inventory with parts, so we match against the same stock.</small>
-      </div>
-      {productSearch && (
-        <div className="cto-product-results">
-          {filteredProducts.length === 0 && (
-            <div className="cto-empty-state">No products match "{productSearch}".</div>
-          )}
-          {filteredProducts.map((product) => {
-            const inventoryMatch = inventoryItems.find(
-              (item) => String(item.part_id) === String(product.part_id)
-            );
-            return (
-              <div key={product.product_id} className="cto-product-card">
-                <div>
-                  <strong>{product.product_name}</strong>
-                  <p className="muted">{product.public_sku || 'No SKU'}</p>
-                  <small>
-                    Part #{product.part_id || '-'}{' '}
-                    {inventoryMatch?.lot?.lot_number ? `- Lot ${inventoryMatch.lot.lot_number}` : ''}
-                  </small>
-                </div>
-                <div className="cto-product-meta">
-                  <span>Supplier: {inventoryMatch?.supplier_name || '-'}</span>
-                  <span>
-                    Exp:{' '}
-                    {inventoryMatch?.lot?.expiration_date
-                      ? new Date(inventoryMatch.lot.expiration_date).toLocaleDateString()
-                      : '-'}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={!inventoryMatch}
-                    onClick={() => addProductViaInventory(product)}
-                  >
-                    {inventoryMatch ? 'Add item' : 'No stock'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
 
   const canContinue = useMemo(() => {
     switch (stepConfig[currentStep].id) {
@@ -350,6 +313,16 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
 
     setLoading(true);
     try {
+      const fromId = Number(formData.from_location_id);
+      const invalidItems = selectedItems.filter(
+        (item) => Number(item.location_id) !== fromId
+      );
+      if (invalidItems.length > 0) {
+        alert('All selected inventory must come from the origin location.');
+        setLoading(false);
+        return;
+      }
+
       const payload = {
         ...formData,
         items: selectedItems.map((item) => ({
@@ -370,7 +343,20 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
       onClose();
     } catch (error) {
       console.error('Failed to create transfer order', error);
-      alert(error.response?.data?.error || error.message);
+
+      // Handle blueprint validation error with detailed message
+      if (error.response?.data?.invalidItems) {
+        const invalidItemsList = error.response.data.invalidItems
+          .map(item => item.part_id)
+          .join(', ');
+        alert(
+          `${error.response.data.message || 'Validation error'}\n\n` +
+          `Invalid items: ${invalidItemsList}\n\n` +
+          `These items are not defined in the selected loadout's blueprint.`
+        );
+      } else {
+        alert(error.response?.data?.error || error.response?.data?.message || error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -423,6 +409,81 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
                 ))}
             </select>
           </div>
+
+          <div className="cto-field">
+            <label>
+              <Package size={16} />
+              Destination Type
+              <button
+                type="button"
+                className="cto-info-icon"
+                onClick={() => setShowDestinationTypeInfo(!showDestinationTypeInfo)}
+                title="Click for more information"
+              >
+                <Info size={16} />
+              </button>
+            </label>
+
+            {showDestinationTypeInfo && (
+              <div className="cto-info-tooltip">
+                <p><strong>General Delivery:</strong> Send items to the destination location's inventory. Items will be available as general stock.</p>
+                <p><strong>Loadout Restock:</strong> Replenish an existing container/tray at the destination. Only items defined in the loadout's blueprint can be sent.</p>
+              </div>
+            )}
+
+            <div className="cto-radio-group">
+              <label className="cto-radio-option">
+                <input
+                  type="radio"
+                  name="destination_type"
+                  value="general_delivery"
+                  checked={formData.destination_type === 'general_delivery'}
+                  onChange={handleInputChange}
+                />
+                <span>General Delivery</span>
+              </label>
+
+              <label className="cto-radio-option">
+                <input
+                  type="radio"
+                  name="destination_type"
+                  value="loadout_restock"
+                  checked={formData.destination_type === 'loadout_restock'}
+                  onChange={handleInputChange}
+                />
+                <span>Loadout Restock</span>
+              </label>
+            </div>
+          </div>
+
+          {formData.destination_type === 'loadout_restock' && (
+            <div className="cto-field">
+              <label>
+                <Box size={16} />
+                Destination Loadout *
+              </label>
+
+              {destinationLoadouts.length === 0 ? (
+                <p className="cto-no-loadouts">
+                  No active loadouts found at destination location.
+                </p>
+              ) : (
+                <select
+                  name="destination_loadout_id"
+                  value={formData.destination_loadout_id}
+                  onChange={handleInputChange}
+                  required
+                >
+                  <option value="">Select a loadout...</option>
+                  {destinationLoadouts.map(loadout => (
+                    <option key={loadout.loadout_id} value={loadout.loadout_id}>
+                      {loadout.full_serial || `${loadout.serial_suffix}`} - {loadout.blueprint_name} ({loadout.location_name})
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
 
           <div className="cto-field-row">
             <div>
@@ -588,8 +649,6 @@ const CreateTransferOrder = ({ onClose, onSuccess }) => {
           {!formData.blueprint_id && (
             <div className="cto-inventory-stack">{inventoryContent}</div>
           )}
-
-          {renderProductLookup()}
 
           <div className="cto-selection-list">
             <div className="cto-selection-head">

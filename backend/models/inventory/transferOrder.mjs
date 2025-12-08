@@ -28,12 +28,33 @@ export default (sequelize) => {
         key: 'location_id'
       }
     },
+    destination_type: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      defaultValue: 'general_delivery'
+    },
+    destination_loadout_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'container_loadouts',
+        key: 'loadout_id'
+      }
+    },
     loadout_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
         model: 'container_loadouts',
         key: 'loadout_id'
+      }
+    },
+    blueprint_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'container_blueprints',
+        key: 'blueprint_id'
       }
     },
     shipment_id: {

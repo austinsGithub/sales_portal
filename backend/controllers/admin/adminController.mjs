@@ -35,7 +35,7 @@ async function getAllUsersHandler(req, res) {
 
     // Get all users with their roles
     const [users] = await pool.query(`
-      SELECT 
+      SELECT
         u.user_id,
         u.username,
         u.email,
@@ -54,8 +54,10 @@ async function getAllUsersHandler(req, res) {
         u.last_login,
         u.created_at,
         u.updated_at,
+        c.company_name,
         GROUP_CONCAT(r.role_name) as roles
       FROM users u
+      LEFT JOIN companies c ON u.company_id = c.company_id
       LEFT JOIN user_roles ur ON u.user_id = ur.user_id
       LEFT JOIN roles r ON ur.role_id = r.role_id
       WHERE u.company_id = ?
@@ -72,6 +74,7 @@ async function getAllUsersHandler(req, res) {
       last_name: user.last_name,
       phone: user.phone,
       company_id: user.company_id,
+      company_name: user.company_name,
       is_active: user.is_active,
       is_super_admin: user.is_super_admin,
       roles: user.roles ? user.roles.split(',') : [],
@@ -851,6 +854,38 @@ async function updateOrderStatus(req, res) {
   }
 }
 
+async function resetUserPasswordHandler(req, res) {
+  try {
+    const err = ensureSuperAdmin(req, res);
+    if (err) return;
+
+    const userId = parseInt(req.params.userId);
+    const { password } = req.body;
+
+    if (!userId || !password) {
+      return res.status(400).json({ success: false, msg: 'User ID and password are required' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, msg: 'Password must be at least 8 characters' });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Update the user's password
+    await pool.query(
+      'UPDATE users SET password_hash = ? WHERE user_id = ? AND company_id = ?',
+      [hashedPassword, userId, req.user.company_id]
+    );
+
+    res.json({ success: true, msg: 'Password reset successfully' });
+  } catch (e) {
+    console.error('Error resetting user password:', e);
+    res.status(500).json({ success: false, msg: 'Failed to reset password' });
+  }
+}
+
 export {
   getAllUsersHandler,
   getUserHandler,
@@ -873,5 +908,6 @@ export {
   assignSubmoduleToRoleHandler,
   removeSubmoduleFromRoleHandler,
   updateUserHandler,
-  updateOrderStatus
+  updateOrderStatus,
+  resetUserPasswordHandler
 };

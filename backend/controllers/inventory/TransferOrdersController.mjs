@@ -1,5 +1,10 @@
 import pool from '../../db/pool.mjs';
 import { ContainerLoadoutsModel } from '../../models/inventory/ContainerLoadouts.mjs';
+import {
+  recordPickMovement,
+  recordShipMovementsForOrder,
+  recordReceiveMovement
+} from '../../services/InventoryMovementService.mjs';
 
 const MAX_LIMIT = 250;
 
@@ -20,6 +25,43 @@ const parseDateOrNull = (value) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+/**
+ * Validates that all items in a transfer order match the destination loadout blueprint
+ * @param {Array} items - Transfer order items with part_id
+ * @param {Number} blueprintId - Destination loadout blueprint ID
+ * @param {Number} companyId - Company ID for security
+ * @param {Object} connection - Database connection
+ * @returns {Object} { valid: boolean, invalidItems: Array, blueprintItems: Array }
+ */
+async function validateItemsAgainstBlueprint(items, blueprintId, companyId, connection) {
+  // Fetch all blueprint items
+  const [blueprintItems] = await exec(
+    connection,
+    `SELECT cbi.*, prod.part_id, prod.product_name, parts.sku
+     FROM container_blueprint_items cbi
+     JOIN container_blueprints cb ON cbi.blueprint_id = cb.blueprint_id
+     JOIN products prod ON cbi.product_id = prod.product_id
+     LEFT JOIN parts ON prod.part_id = parts.part_id
+     WHERE cbi.blueprint_id = ? AND cb.company_id = ?`,
+    [blueprintId, companyId]
+  );
+
+  const allowedPartIds = new Set(
+    blueprintItems.map(item => item.part_id).filter(Boolean)
+  );
+
+  const invalidItems = items.filter(item =>
+    item.part_id && !allowedPartIds.has(item.part_id)
+  );
+
+  return {
+    valid: invalidItems.length === 0,
+    invalidItems,
+    blueprintItems,
+    allowedPartIds: Array.from(allowedPartIds)
+  };
+}
+
 async function generateTransferOrderNumber(company_id) {
   const [[last]] = await pool.query(
     `SELECT transfer_order_number
@@ -37,52 +79,6 @@ async function generateTransferOrderNumber(company_id) {
   const [, numeric] = last.transfer_order_number.split('-');
   const nextSequence = (parseInt(numeric, 10) || 0) + 1;
   return `TO-${String(nextSequence).padStart(4, '0')}`;
-}
-
-async function getOrCreateLoadout({ company_id, blueprint_id, location_id, created_by }) {
-  if (!blueprint_id || !location_id) return null;
-
-  const [existing] = await pool.query(
-    `SELECT loadout_id
-     FROM container_loadouts
-     WHERE company_id = ? AND blueprint_id = ? AND location_id = ? AND is_active = 1
-     ORDER BY loadout_id DESC
-     LIMIT 1`,
-    [company_id, blueprint_id, location_id]
-  );
-
-  if (existing.length) {
-    return existing[0].loadout_id;
-  }
-
-  const [[lastSuffix]] = await pool.query(
-    `SELECT serial_suffix
-     FROM container_loadouts
-     WHERE company_id = ?
-     ORDER BY loadout_id DESC
-     LIMIT 1`,
-    [company_id]
-  );
-
-  let suffix = '001';
-  const lastValue = lastSuffix?.serial_suffix;
-  if (lastValue) {
-    const numeric = parseInt(lastValue, 10);
-    if (!Number.isNaN(numeric)) {
-      suffix = String(numeric + 1).padStart(3, '0');
-    }
-  }
-
-  const loadout = await ContainerLoadoutsModel.create({
-    blueprint_id,
-    company_id,
-    location_id,
-    serial_suffix: suffix,
-    created_by,
-    notes: 'Auto-created for transfer order'
-  });
-
-  return loadout?.loadout_id || null;
 }
 
 async function fetchBlueprintItems(connection, blueprint_id, company_id) {
@@ -219,12 +215,13 @@ async function assignInventoryToOrder({
     );
   }
 
-  await exec(
+  const [result] = await exec(
     connection,
     `INSERT INTO transfer_order_items (
       transfer_order_id,
       loadout_id,
       inventory_id,
+      picked_inventory_id,
       part_id,
       lot_id,
       quantity,
@@ -233,10 +230,11 @@ async function assignInventoryToOrder({
       expiration_date,
       notes,
       company_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       order.transfer_order_id,
       order.loadout_id || null,
+      inventoryRow.inventory_id,
       inventoryRow.inventory_id,
       part_id,
       inventoryRow.lot_id || null,
@@ -249,7 +247,10 @@ async function assignInventoryToOrder({
     ]
   );
 
-  return qty;
+  return {
+    quantity_applied: qty,
+    transfer_order_item_id: result?.insertId || null
+  };
 }
 
 async function autoAssignBlueprintInventory({
@@ -294,21 +295,28 @@ async function autoAssignBlueprintInventory({
 
     const [inventoryRows] = await exec(
       connection,
-      `SELECT 
+      `SELECT
         inv.inventory_id,
         inv.part_id,
         inv.lot_id,
         inv.quantity_available,
         inv.serial_number,
         inv.location_id,
-        l.expiration_date
+        inv.bin_id,
+        l.expiration_date,
+        b.aisle,
+        b.rack,
+        b.shelf,
+        b.bin,
+        b.zone
        FROM inventory inv
        LEFT JOIN lots l ON inv.lot_id = l.lot_id
+       LEFT JOIN bins b ON inv.bin_id = b.bin_id AND b.company_id = inv.company_id
        WHERE inv.company_id = ?
          AND inv.location_id = ?
          AND inv.part_id = ?
          AND inv.quantity_available > 0
-       ORDER BY 
+       ORDER BY
          CASE WHEN l.expiration_date IS NULL THEN 1 ELSE 0 END,
          l.expiration_date ASC`,
       [company_id, Number(from_location_id), item.part_id]
@@ -345,37 +353,58 @@ async function autoAssignBlueprintInventory({
 
 async function fetchOrder(company_id, orderId) {
   const [[order]] = await pool.query(
-    `SELECT 
+    `SELECT
       o.*,
       fl.location_name AS from_location_name,
       fl.location_type AS from_location_type,
+      fl.address AS from_address,
+      fl.city AS from_city,
+      fl.state AS from_state,
+      fl.country AS from_country,
+      fl.postal_code AS from_postal_code,
       tl.location_name AS to_location_name,
       tl.location_type AS to_location_type,
+      tl.address AS to_address,
+      tl.city AS to_city,
+      tl.state AS to_state,
+      tl.country AS to_country,
+      tl.postal_code AS to_postal_code,
       cl.loadout_id,
-      cl.blueprint_id,
+      cl.blueprint_id AS loadout_blueprint_id,
       cl.serial_suffix AS loadout_serial_suffix,
-      cb.blueprint_name,
+      COALESCE(ob.blueprint_name, cb.blueprint_name) AS blueprint_name,
+      ob.blueprint_name AS order_blueprint_name,
+      cb.blueprint_name AS loadout_blueprint_name,
+      dl.serial_suffix AS destination_loadout_serial,
+      CONCAT(dcb.serial_number_prefix, dl.serial_suffix) AS destination_loadout_full_serial,
+      dcb.blueprint_name AS destination_blueprint_name,
       creator.first_name AS created_by_first_name,
       creator.last_name AS created_by_last_name,
       approver.first_name AS approved_by_first_name,
       approver.last_name AS approved_by_last_name,
+      picker.first_name AS picked_by_first_name,
+      picker.last_name AS picked_by_last_name,
+      packer.first_name AS packed_by_first_name,
+      packer.last_name AS packed_by_last_name,
       shipper.first_name AS shipped_by_first_name,
       shipper.last_name AS shipped_by_last_name,
       receiver.first_name AS received_by_first_name,
-      receiver.last_name AS received_by_last_name,
-      COUNT(items.transfer_order_item_id) AS item_count
+      receiver.last_name AS received_by_last_name
     FROM transfer_orders o
     LEFT JOIN locations fl ON o.from_location_id = fl.location_id
     LEFT JOIN locations tl ON o.to_location_id = tl.location_id
     LEFT JOIN container_loadouts cl ON o.loadout_id = cl.loadout_id
     LEFT JOIN container_blueprints cb ON cl.blueprint_id = cb.blueprint_id
+    LEFT JOIN container_blueprints ob ON o.blueprint_id = ob.blueprint_id
+    LEFT JOIN container_loadouts dl ON o.destination_loadout_id = dl.loadout_id
+    LEFT JOIN container_blueprints dcb ON dl.blueprint_id = dcb.blueprint_id
     LEFT JOIN users creator ON o.created_by = creator.user_id
     LEFT JOIN users approver ON o.approved_by = approver.user_id
+    LEFT JOIN users picker ON o.picked_by = picker.user_id
+    LEFT JOIN users packer ON o.packed_by = packer.user_id
     LEFT JOIN users shipper ON o.shipped_by = shipper.user_id
     LEFT JOIN users receiver ON o.received_by = receiver.user_id
-    LEFT JOIN transfer_order_items items ON o.transfer_order_id = items.transfer_order_id
-    WHERE o.company_id = ? AND o.transfer_order_id = ?
-    GROUP BY o.transfer_order_id`,
+    WHERE o.company_id = ? AND o.transfer_order_id = ?`,
     [company_id, orderId]
   );
 
@@ -384,7 +413,7 @@ async function fetchOrder(company_id, orderId) {
 
 async function fetchOrderItems(company_id, orderId) {
   const [items] = await pool.query(
-    `SELECT 
+    `SELECT
       toi.*,
       p.product_name,
       p.sku,
@@ -394,12 +423,19 @@ async function fetchOrderItems(company_id, orderId) {
       l.expiration_date,
       inv.serial_number AS inventory_serial_number,
       inv.quantity_available,
-      loc.location_name AS inventory_location
+      inv.bin_id,
+      loc.location_name AS inventory_location,
+      b.aisle,
+      b.rack,
+      b.shelf,
+      b.bin,
+      b.zone
     FROM transfer_order_items toi
     LEFT JOIN inventory inv ON toi.inventory_id = inv.inventory_id
     LEFT JOIN parts p ON p.part_id = COALESCE(toi.part_id, inv.part_id)
     LEFT JOIN lots l ON l.lot_id = COALESCE(toi.lot_id, inv.lot_id)
     LEFT JOIN locations loc ON inv.location_id = loc.location_id
+    LEFT JOIN bins b ON inv.bin_id = b.bin_id AND b.company_id = toi.company_id
     WHERE toi.transfer_order_id = ? AND toi.company_id = ?
     ORDER BY toi.transfer_order_item_id ASC`,
     [orderId, company_id]
@@ -535,15 +571,35 @@ class TransferOrdersController {
       const safeLimit = Math.min(Number(limit) || 100, MAX_LIMIT);
       const safeOffset = Math.max(Number(offset) || 0, 0);
 
+      // Get total count for pagination
+      const [[{ total }]] = await pool.query(
+        `SELECT COUNT(DISTINCT o.transfer_order_id) as total
+        FROM transfer_orders o
+        LEFT JOIN locations fl ON o.from_location_id = fl.location_id
+        LEFT JOIN locations tl ON o.to_location_id = tl.location_id
+        LEFT JOIN container_loadouts cl ON o.loadout_id = cl.loadout_id
+        LEFT JOIN container_blueprints cb ON cl.blueprint_id = cb.blueprint_id
+        LEFT JOIN container_blueprints ob ON o.blueprint_id = ob.blueprint_id
+        LEFT JOIN users creator ON o.created_by = creator.user_id
+        ${where}`,
+        params
+      );
+
       params.push(safeLimit, safeOffset);
 
       const [rows] = await pool.query(
-        `SELECT 
+        `SELECT
           o.*,
           fl.location_name AS from_location_name,
           tl.location_name AS to_location_name,
           cl.serial_suffix AS loadout_serial_suffix,
-          cb.blueprint_name,
+          cl.blueprint_id AS loadout_blueprint_id,
+          COALESCE(ob.blueprint_name, cb.blueprint_name) AS blueprint_name,
+          ob.blueprint_name AS order_blueprint_name,
+          cb.blueprint_name AS loadout_blueprint_name,
+          dl.serial_suffix AS destination_loadout_serial,
+          CONCAT(dcb.serial_number_prefix, dl.serial_suffix) AS destination_loadout_full_serial,
+          dcb.blueprint_name AS destination_blueprint_name,
           creator.first_name AS created_by_first_name,
           creator.last_name AS created_by_last_name,
           COUNT(items.transfer_order_item_id) AS item_count
@@ -552,6 +608,9 @@ class TransferOrdersController {
         LEFT JOIN locations tl ON o.to_location_id = tl.location_id
         LEFT JOIN container_loadouts cl ON o.loadout_id = cl.loadout_id
         LEFT JOIN container_blueprints cb ON cl.blueprint_id = cb.blueprint_id
+        LEFT JOIN container_blueprints ob ON o.blueprint_id = ob.blueprint_id
+        LEFT JOIN container_loadouts dl ON o.destination_loadout_id = dl.loadout_id
+        LEFT JOIN container_blueprints dcb ON dl.blueprint_id = dcb.blueprint_id
         LEFT JOIN users creator ON o.created_by = creator.user_id
         LEFT JOIN transfer_order_items items ON o.transfer_order_id = items.transfer_order_id
         ${where}
@@ -561,7 +620,16 @@ class TransferOrdersController {
         params
       );
 
-      return res.json(rows);
+      return res.json({
+        data: rows,
+        pagination: {
+          total: Number(total),
+          limit: safeLimit,
+          offset: safeOffset,
+          page: Math.floor(safeOffset / safeLimit) + 1,
+          totalPages: Math.ceil(total / safeLimit)
+        }
+      });
     } catch (error) {
       console.error('Error fetching transfer orders:', error);
       return res.status(500).json({ error: 'Failed to fetch transfer orders' });
@@ -597,6 +665,9 @@ class TransferOrdersController {
       const {
         from_location_id,
         to_location_id,
+        destination_type = 'general_delivery',
+        destination_loadout_id = null,
+        loadout_id = null,
         blueprint_id,
         transfer_reason,
         priority = 'Medium',
@@ -613,6 +684,80 @@ class TransferOrdersController {
         return res.status(400).json({ error: 'Source and destination locations must be different' });
       }
 
+      // Validate destination type
+      const validTypes = ['general_delivery', 'loadout_restock'];
+      if (!validTypes.includes(destination_type)) {
+        return res.status(400).json({
+          error: 'Invalid destination_type. Must be general_delivery or loadout_restock'
+        });
+      }
+
+      // If loadout restock, destination_loadout_id is required
+      if (destination_type === 'loadout_restock') {
+        if (!destination_loadout_id) {
+          return res.status(400).json({
+            error: 'destination_loadout_id is required when destination_type is loadout_restock'
+          });
+        }
+
+        // Verify loadout exists and is at destination location
+        const [[destLoadout]] = await pool.query(
+          `SELECT cl.loadout_id, cl.blueprint_id, cl.location_id
+           FROM container_loadouts cl
+           WHERE cl.loadout_id = ? AND cl.company_id = ? AND cl.is_active = 1`,
+          [destination_loadout_id, company_id]
+        );
+
+        if (!destLoadout) {
+          return res.status(404).json({
+            error: 'Destination loadout not found or inactive'
+          });
+        }
+
+        if (Number(destLoadout.location_id) !== Number(to_location_id)) {
+          return res.status(400).json({
+            error: 'Destination loadout must be at the destination location'
+          });
+        }
+      } else {
+        // General delivery - destination_loadout_id must be null
+        if (destination_loadout_id) {
+          return res.status(400).json({
+            error: 'destination_loadout_id must be null for general_delivery type'
+          });
+        }
+      }
+
+      // Validate manually-selected source loadout (no auto-creation)
+      let sourceLoadoutId = null;
+      let sourceBlueprintId = blueprint_id ? Number(blueprint_id) : null;
+
+      if (loadout_id) {
+        const loadout = await ContainerLoadoutsModel.getById(Number(loadout_id), company_id);
+        if (!loadout || loadout.is_active === 0) {
+          return res.status(404).json({ error: 'Loadout not found or inactive' });
+        }
+
+        if (Number(loadout.location_id) !== Number(from_location_id)) {
+          return res.status(400).json({
+            error: 'Selected loadout must be at the transfer origin location'
+          });
+        }
+
+        if (
+          sourceBlueprintId &&
+          loadout.blueprint_id &&
+          Number(sourceBlueprintId) !== Number(loadout.blueprint_id)
+        ) {
+          return res.status(400).json({
+            error: 'Selected loadout blueprint does not match provided blueprint_id'
+          });
+        }
+
+        sourceLoadoutId = loadout.loadout_id;
+        sourceBlueprintId = loadout.blueprint_id || sourceBlueprintId;
+      }
+
       await connection.beginTransaction();
 
       const transfer_order_number = await generateTransferOrderNumber(company_id);
@@ -622,6 +767,10 @@ class TransferOrdersController {
           transfer_order_number,
           from_location_id,
           to_location_id,
+          destination_type,
+          destination_loadout_id,
+          loadout_id,
+          blueprint_id,
           transfer_reason,
           status,
           priority,
@@ -629,11 +778,15 @@ class TransferOrdersController {
           notes,
           created_by,
           company_id
-        ) VALUES (?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?, ?, ?, ?)`,
         [
           transfer_order_number,
           Number(from_location_id),
           Number(to_location_id),
+          destination_type,
+          destination_loadout_id ? Number(destination_loadout_id) : null,
+          sourceLoadoutId,
+          sourceBlueprintId,
           transfer_reason || null,
           priority,
           parseDateOrNull(requested_date),
@@ -645,64 +798,123 @@ class TransferOrdersController {
 
       const transfer_order_id = result.insertId;
 
-      let loadoutId = null;
-      if (blueprint_id) {
-        loadoutId = await getOrCreateLoadout({
-          company_id,
-          blueprint_id: Number(blueprint_id),
-          location_id: Number(from_location_id),
-          created_by: user_id
-        });
+      if (Array.isArray(items) && items.length > 0) {
+        const orderStub = {
+          transfer_order_id,
+          loadout_id: sourceLoadoutId || null,
+          transfer_order_number,
+          from_location_id: Number(from_location_id)
+        };
 
-        if (loadoutId) {
+        for (const item of items) {
+          const qty = Number(item.quantity) || 0;
+          if (!qty || qty <= 0) continue;
+
+          if (item.inventory_id) {
+            const [[inventoryRow]] = await connection.query(
+              `SELECT * FROM inventory WHERE inventory_id = ? AND company_id = ?`,
+              [item.inventory_id, company_id]
+            );
+
+            if (!inventoryRow) {
+              throw new Error(`Inventory ${item.inventory_id} not found for this company.`);
+            }
+
+            if (
+              orderStub.from_location_id &&
+              inventoryRow.location_id &&
+              Number(inventoryRow.location_id) !== Number(orderStub.from_location_id)
+            ) {
+              await connection.rollback();
+              return res.status(400).json({
+                error: 'Inventory must be pulled from the transfer origin location.',
+                inventory_id: item.inventory_id
+              });
+            }
+
+            await assignInventoryToOrder({
+              connection,
+              company_id,
+              order: orderStub,
+              blueprintItem: null,
+              inventoryRow,
+              quantity: qty,
+              note: item.notes || null
+            });
+            continue;
+          }
+
           await connection.query(
-            `UPDATE transfer_orders SET loadout_id = ? WHERE transfer_order_id = ?`,
-            [loadoutId, transfer_order_id]
+            `INSERT INTO transfer_order_items (
+              transfer_order_id,
+              loadout_id,
+              inventory_id,
+              picked_inventory_id,
+              part_id,
+              lot_id,
+              quantity,
+              unit_of_measure,
+              serial_number,
+              expiration_date,
+              notes,
+              company_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              transfer_order_id,
+              sourceLoadoutId || null,
+              item.inventory_id || null,
+              item.inventory_id || null,
+              item.part_id || null,
+              item.lot_id || null,
+              qty,
+              item.unit_of_measure || item.part?.unit_of_measure || 'EA',
+              item.serial_number || null,
+              parseDateOrNull(item.expiration_date),
+              item.notes || null,
+              company_id
+            ]
           );
-
-          await autoAssignBlueprintInventory({
-            connection,
-            company_id,
-            blueprint_id: Number(blueprint_id),
-            loadout_id: loadoutId,
-            transfer_order_id,
-            from_location_id: Number(from_location_id),
-            transfer_order_number
-          });
         }
       }
 
-      if (Array.isArray(items) && items.length > 0) {
-        const insertValues = items.map((item) => [
-          transfer_order_id,
-          null,
-          item.inventory_id || null,
-          item.part_id || null,
-          item.lot_id || null,
-          Number(item.quantity) || 0,
-          item.unit_of_measure || item.part?.unit_of_measure || 'EA',
-          item.serial_number || null,
-          parseDateOrNull(item.expiration_date),
-          item.notes || null,
-          company_id
-        ]);
-
-        await connection.query(
-          `INSERT INTO transfer_order_items (
-            transfer_order_id,
-            loadout_id,
-            inventory_id,
-            part_id,
-            lot_id,
-            quantity,
-            unit_of_measure,
-            serial_number,
-            expiration_date,
-            notes,
-            company_id
-          ) VALUES ?`,
-          [insertValues]
+      // Validate items against destination loadout blueprint if restock type
+      if (destination_type === 'loadout_restock' && destination_loadout_id) {
+        // Get blueprint_id from destination loadout
+        const [[destLoadout]] = await connection.query(
+          `SELECT blueprint_id FROM container_loadouts
+           WHERE loadout_id = ? AND company_id = ?`,
+          [destination_loadout_id, company_id]
         );
+
+        if (destLoadout && destLoadout.blueprint_id) {
+          // Fetch all items for this transfer order
+          const [orderItems] = await connection.query(
+            `SELECT part_id FROM transfer_order_items
+             WHERE transfer_order_id = ? AND company_id = ?`,
+            [transfer_order_id, company_id]
+          );
+
+          if (orderItems.length > 0) {
+            // Validate items
+            const validation = await validateItemsAgainstBlueprint(
+              orderItems,
+              destLoadout.blueprint_id,
+              company_id,
+              connection
+            );
+
+            if (!validation.valid) {
+              await connection.rollback();
+              return res.status(400).json({
+                error: 'Some items are not defined in the destination loadout blueprint',
+                invalidItems: validation.invalidItems.map(item => ({
+                  part_id: item.part_id
+                })),
+                message: 'When restocking a loadout, only items defined in its blueprint can be sent'
+              });
+            }
+          }
+        }
       }
 
       await connection.commit();
@@ -719,6 +931,7 @@ class TransferOrdersController {
   }
 
   async update(req, res) {
+    const connection = await pool.getConnection();
     try {
       const company_id = req.user?.company_id;
       const user_id = req.user?.user_id;
@@ -726,83 +939,420 @@ class TransferOrdersController {
       if (!company_id || !user_id) return res.status(401).json({ error: 'Missing user context' });
       if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid transfer order id' });
 
-      const allowedFields = [
-        'status',
-        'priority',
-        'transfer_reason',
-        'notes',
-        'requested_date',
-        'approved_date',
-        'ship_date',
-        'expected_arrival_date',
-        'received_date',
-        'completed_date',
-        'carrier',
-        'tracking_number',
-        'freight_cost',
-        'temperature_control_required'
-      ];
+      await connection.beginTransaction();
 
-      const patch = pick(req.body || {}, allowedFields);
+      // Handle status-specific inventory operations
+      const newStatus = req.body?.status;
 
-      if (patch.requested_date) patch.requested_date = parseDateOrNull(patch.requested_date);
-      if (patch.ship_date) patch.ship_date = parseDateOrNull(patch.ship_date);
-      if (patch.expected_arrival_date) patch.expected_arrival_date = parseDateOrNull(patch.expected_arrival_date);
-      if (patch.received_date) patch.received_date = parseDateOrNull(patch.received_date);
-      if (patch.completed_date) patch.completed_date = parseDateOrNull(patch.completed_date);
-      if (patch.approved_date) patch.approved_date = parseDateOrNull(patch.approved_date);
+      if (newStatus === 'Picked') {
+        // PICKED: Decrement inventory at source location
+        // Validate that we have items to pick; fall back to ordered qty when no scanned qty exists
+        const [items] = await connection.query(
+          `SELECT transfer_order_item_id, picked_inventory_id, inventory_id, quantity, quantity_picked
+           FROM transfer_order_items
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          [id, company_id]
+        );
 
-      if (req.body?.status) {
-        patch.status = req.body.status;
-        const now = new Date();
-        switch (req.body.status) {
-          case 'Approved':
-            patch.approved_date = now;
-            patch.approved_by = user_id;
-            break;
-          case 'Shipped':
-            patch.ship_date = now;
-            patch.shipped_by = user_id;
-            break;
-          case 'Received':
-            patch.received_date = now;
-            patch.received_by = user_id;
-            break;
-          case 'Completed':
-            patch.completed_date = now;
-            break;
-          default:
-            break;
+        const totalToPick = items.reduce((sum, item) => {
+          const picked = Number(item.quantity_picked) || 0;
+          const ordered = Number(item.quantity) || 0;
+          return sum + (picked > 0 ? picked : ordered);
+        }, 0);
+
+        if (!totalToPick || totalToPick <= 0) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: 'Cannot mark as Picked: No quantities are assigned to pick for this order.'
+          });
+        }
+
+        for (const item of items) {
+          const sourceInventoryId = item.picked_inventory_id || item.inventory_id;
+          if (!sourceInventoryId) continue;
+
+          const remaining =
+            (Number(item.quantity) || 0) - (Number(item.quantity_picked) || 0);
+          if (remaining <= 0) continue;
+
+          // Check available inventory before decrementing (prevent negative inventory)
+          const [[inv]] = await connection.query(
+            `SELECT quantity_on_hand, quantity_reserved
+             FROM inventory
+             WHERE inventory_id = ? AND company_id = ?`,
+            [sourceInventoryId, company_id]
+          );
+
+          if (!inv) {
+            throw new Error(`Inventory record not found for item ${item.transfer_order_item_id}`);
+          }
+
+          if (inv.quantity_on_hand < remaining) {
+            throw new Error(
+              `Insufficient inventory: Item ${item.transfer_order_item_id} requires ${remaining} but only ${inv.quantity_on_hand} available on hand`
+            );
+          }
+
+          if (inv.quantity_reserved < remaining) {
+            throw new Error(
+              `Insufficient reserved inventory: Item ${item.transfer_order_item_id} requires ${remaining} but only ${inv.quantity_reserved} reserved`
+            );
+          }
+
+          // Decrement source inventory (both on_hand and reserved)
+          await connection.query(
+            `UPDATE inventory
+             SET quantity_on_hand  = quantity_on_hand  - ?,
+                 quantity_reserved = quantity_reserved - ?
+             WHERE inventory_id = ? AND company_id = ?`,
+            [remaining, remaining, sourceInventoryId, company_id]
+          );
+
+          // Update item picked fields
+          await connection.query(
+            `UPDATE transfer_order_items
+             SET quantity_picked = quantity_picked + ?,
+                 picked_by       = ?,
+                 picked_at       = NOW()
+             WHERE transfer_order_item_id = ? AND company_id = ?`,
+            [remaining, user_id, item.transfer_order_item_id, company_id]
+          );
+
+          // Record PICK movement
+          await recordPickMovement({
+            connection: connection,
+            companyId: company_id,
+            transferOrderId: id,
+            transferOrderItemId: item.transfer_order_item_id,
+            sourceInventoryId,
+            quantity: remaining,
+            userId: user_id
+          });
+        }
+
+        // Update order status
+        await connection.query(
+          `UPDATE transfer_orders
+           SET status = 'Picked',
+               picked_date = NOW(),
+               picked_by   = ?
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          [user_id, id, company_id]
+        );
+
+      } else if (newStatus === 'Shipped') {
+        // SHIPPED: Log in-transit movements (no inventory changes)
+        // Validate that items were picked before shipping
+        const [[pickedCheck]] = await connection.query(
+          `SELECT SUM(quantity_picked) as total_picked
+           FROM transfer_order_items
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          [id, company_id]
+        );
+
+        if (!pickedCheck || !pickedCheck.total_picked || pickedCheck.total_picked === 0) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: 'Cannot ship order with no picked items. Please pick items first.'
+          });
+        }
+
+        await recordShipMovementsForOrder({
+          connection: connection,
+          transferOrderId: id,
+          userId: user_id
+        });
+
+        await connection.query(
+          `UPDATE transfer_orders
+           SET status = 'Shipped',
+               ship_date = CURDATE(),
+               shipped_by = ?
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          [user_id, id, company_id]
+        );
+
+      } else if (newStatus === 'Received') {
+        // RECEIVED: Create/increment inventory at destination location
+        // Validate that order was shipped before receiving
+        const [[currentOrder]] = await connection.query(
+          `SELECT status FROM transfer_orders WHERE transfer_order_id = ? AND company_id = ?`,
+          [id, company_id]
+        );
+
+        if (currentOrder.status !== 'Shipped') {
+          await connection.rollback();
+          return res.status(400).json({
+            error: `Order must be shipped before it can be received. Current status: ${currentOrder.status}`
+          });
+        }
+
+        // Validate that items were actually picked
+        const [[receiveCheck]] = await connection.query(
+          `SELECT SUM(quantity_picked) as total_picked
+           FROM transfer_order_items
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          [id, company_id]
+        );
+
+        if (!receiveCheck || !receiveCheck.total_picked || receiveCheck.total_picked === 0) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: 'Cannot receive order: No items were picked. Nothing to receive.'
+          });
+        }
+        const [items] = await connection.query(
+          `SELECT transfer_order_item_id, part_id, lot_id, quantity_picked, picked_inventory_id
+           FROM transfer_order_items
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          [id, company_id]
+        );
+
+        const [[order]] = await connection.query(
+          `SELECT company_id, to_location_id, destination_type, destination_loadout_id, transfer_order_number
+           FROM transfer_orders
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          [id, company_id]
+        );
+
+        for (const item of items) {
+          if (item.quantity_picked <= 0) continue;
+
+          // Get supplier_id from source inventory (to preserve supplier tracking)
+          let sourceSupplier = null;
+          if (item.picked_inventory_id) {
+            const [[sourceInv]] = await connection.query(
+              `SELECT supplier_id FROM inventory WHERE inventory_id = ? AND company_id = ?`,
+              [item.picked_inventory_id, company_id]
+            );
+            sourceSupplier = sourceInv?.supplier_id || null;
+          }
+
+          // Find existing destination inventory (match any bin at location)
+          const [rows] = await connection.query(
+            `SELECT inventory_id
+             FROM inventory
+             WHERE company_id  = ?
+               AND part_id     = ?
+               AND (lot_id     <=> ?)
+               AND location_id = ?
+             LIMIT 1`,
+            [
+              order.company_id,
+              item.part_id,
+              item.lot_id,
+              order.to_location_id
+            ]
+          );
+
+          let destInventoryId;
+
+          if (rows.length === 0) {
+            // Create new destination inventory with supplier_id from source
+            const [result] = await connection.query(
+              `INSERT INTO inventory (
+                 company_id,
+                 part_id,
+                 lot_id,
+                 supplier_id,
+                 location_id,
+                 bin_id,
+                 quantity_on_hand,
+                 quantity_available,
+                 quantity_reserved,
+                 quantity_on_order,
+                 received_date,
+                 is_active
+               ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 0, 0, CURDATE(), 1)`,
+              [
+                order.company_id,
+                item.part_id,
+                item.lot_id,
+                sourceSupplier,
+                order.to_location_id,
+                item.quantity_picked,
+                item.quantity_picked
+              ]
+            );
+            destInventoryId = result.insertId;
+          } else {
+            // Increment existing destination inventory
+            destInventoryId = rows[0].inventory_id;
+
+            await connection.query(
+              `UPDATE inventory
+               SET quantity_on_hand   = quantity_on_hand   + ?,
+                   quantity_available = quantity_available + ?
+               WHERE inventory_id = ? AND company_id = ?`,
+              [item.quantity_picked, item.quantity_picked, destInventoryId, order.company_id]
+            );
+          }
+
+          // If destination is loadout restock, add inventory to destination loadout
+          if (order.destination_type === 'loadout_restock' && order.destination_loadout_id) {
+            // Get product_id for the part
+            const [[partInfo]] = await connection.query(
+              `SELECT product_id FROM products WHERE part_id = ? AND company_id = ? LIMIT 1`,
+              [item.part_id, order.company_id]
+            );
+
+            if (partInfo) {
+              // Add to container_loadout_lots
+              await connection.query(
+                `INSERT INTO container_loadout_lots
+                  (loadout_id, product_id, lot_id, quantity_used, notes)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                   quantity_used = quantity_used + VALUES(quantity_used)`,
+                [
+                  order.destination_loadout_id,
+                  partInfo.product_id,
+                  item.lot_id,
+                  item.quantity_picked,
+                  `Received from transfer order ${order.transfer_order_number}`
+                ]
+              );
+
+              // Update destination inventory to reference the loadout
+              await connection.query(
+                `UPDATE inventory
+                 SET loadout_id = ?
+                 WHERE inventory_id = ? AND company_id = ?`,
+                [order.destination_loadout_id, destInventoryId, order.company_id]
+              );
+            }
+          }
+
+          // Record RECEIVE movement
+          await recordReceiveMovement({
+            connection: connection,
+            transferOrderItemId: item.transfer_order_item_id,
+            destinationInventoryId: destInventoryId,
+            toBinId: null,
+            userId: user_id
+          });
+        }
+
+        await connection.query(
+          `UPDATE transfer_orders
+           SET status        = 'Received',
+               received_date = CURDATE(),
+               received_by   = ?
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          [user_id, id, company_id]
+        );
+
+      } else {
+        // For other status changes or non-status updates, use the old logic
+        const allowedFields = [
+          'status',
+          'priority',
+          'transfer_reason',
+          'notes',
+          'requested_date',
+          'approved_date',
+          'picked_date',
+          'packed_date',
+          'ship_date',
+          'expected_arrival_date',
+          'received_date',
+          'completed_date',
+          'carrier',
+          'tracking_number',
+          'freight_cost',
+          'temperature_control_required'
+        ];
+
+        const patch = pick(req.body || {}, allowedFields);
+
+        if (patch.requested_date) patch.requested_date = parseDateOrNull(patch.requested_date);
+        if (patch.ship_date) patch.ship_date = parseDateOrNull(patch.ship_date);
+        if (patch.expected_arrival_date) patch.expected_arrival_date = parseDateOrNull(patch.expected_arrival_date);
+        if (patch.received_date) patch.received_date = parseDateOrNull(patch.received_date);
+        if (patch.completed_date) patch.completed_date = parseDateOrNull(patch.completed_date);
+        if (patch.approved_date) patch.approved_date = parseDateOrNull(patch.approved_date);
+        if (patch.picked_date) patch.picked_date = parseDateOrNull(patch.picked_date);
+        if (patch.packed_date) patch.packed_date = parseDateOrNull(patch.packed_date);
+
+        if (req.body?.status) {
+          // Block critical workflow statuses from being set via this path
+          const workflowStatuses = ['Picked', 'Shipped', 'Received'];
+          if (workflowStatuses.includes(req.body.status)) {
+            await connection.rollback();
+            return res.status(400).json({
+              error: `Status "${req.body.status}" must be set through the proper workflow with inventory movement tracking.`
+            });
+          }
+
+          // Block "Completed" unless order was received
+          if (req.body.status === 'Completed') {
+            const [[currentOrder]] = await connection.query(
+              `SELECT status FROM transfer_orders WHERE transfer_order_id = ? AND company_id = ?`,
+              [id, company_id]
+            );
+
+            if (currentOrder.status !== 'Received') {
+              await connection.rollback();
+              return res.status(400).json({
+                error: `Cannot mark as Completed: Order must be Received first. Current status: ${currentOrder.status}`
+              });
+            }
+          }
+
+          patch.status = req.body.status;
+          const now = new Date();
+          switch (req.body.status) {
+            case 'Approved':
+              patch.approved_date = now;
+              patch.approved_by = user_id;
+              break;
+            case 'Packed':
+              patch.packed_date = now;
+              patch.packed_by = user_id;
+              break;
+            case 'Completed':
+              patch.completed_date = now;
+              break;
+            default:
+              break;
+          }
+        }
+
+        if (Object.keys(patch).length === 0) {
+          return res.status(400).json({ error: 'No fields to update' });
+        }
+
+        const setClauses = Object.keys(patch).map((field) => `${field} = ?`);
+        const values = [...Object.values(patch), id, company_id];
+
+        const [result] = await connection.query(
+          `UPDATE transfer_orders
+           SET ${setClauses.join(', ')}, updated_at = NOW()
+           WHERE transfer_order_id = ? AND company_id = ?`,
+          values
+        );
+
+        if (!result.affectedRows) {
+          await connection.rollback();
+          return res.status(404).json({ error: 'Transfer order not found' });
         }
       }
 
-      if (Object.keys(patch).length === 0) {
-        return res.status(400).json({ error: 'No fields to update' });
-      }
-
-      const setClauses = Object.keys(patch).map((field) => `${field} = ?`);
-      const values = [...Object.values(patch), id, company_id];
-
-      const [result] = await pool.query(
-        `UPDATE transfer_orders
-         SET ${setClauses.join(', ')}, updated_at = NOW()
-         WHERE transfer_order_id = ? AND company_id = ?`,
-        values
-      );
-
-      if (!result.affectedRows) {
-        return res.status(404).json({ error: 'Transfer order not found' });
-      }
+      await connection.commit();
 
       const updated = await getOrderWithItems(company_id, id);
       return res.json(updated);
     } catch (error) {
+      await connection.rollback();
       console.error('Error updating transfer order:', error);
       return res.status(500).json({ error: 'Failed to update transfer order' });
+    } finally {
+      connection.release();
     }
   }
 
   async addItem(req, res) {
+    const connection = await pool.getConnection();
     try {
       const company_id = req.user?.company_id;
       const id = Number(req.params.id);
@@ -823,45 +1373,96 @@ class TransferOrdersController {
         notes
       } = req.body || {};
 
-      if (!quantity) {
+      const qty = Number(quantity) || 0;
+      if (!qty || qty <= 0) {
         return res.status(400).json({ error: 'Quantity is required' });
       }
 
-      const [result] = await pool.query(
-        `INSERT INTO transfer_order_items (
-          transfer_order_id,
-          loadout_id,
-          inventory_id,
-          part_id,
-          lot_id,
-          quantity,
-          unit_of_measure,
-          serial_number,
-          expiration_date,
-          notes,
-          company_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          order.loadout_id || null,
-          inventory_id || null,
-          part_id || null,
-          lot_id || null,
-          Number(quantity) || 0,
-          unit_of_measure || 'EA',
-          serial_number || null,
-          parseDateOrNull(expiration_date),
-          notes || null,
-          company_id
-        ]
-      );
+      await connection.beginTransaction();
+      let insertedItemId = null;
+
+      if (inventory_id) {
+        const [[inventoryRow]] = await connection.query(
+          `SELECT * FROM inventory WHERE inventory_id = ? AND company_id = ?`,
+          [inventory_id, company_id]
+        );
+
+        if (!inventoryRow) {
+          await connection.rollback();
+          return res.status(404).json({ error: 'Inventory record not found' });
+        }
+
+        if (
+          order.from_location_id &&
+          inventoryRow.location_id &&
+          Number(inventoryRow.location_id) !== Number(order.from_location_id)
+        ) {
+          await connection.rollback();
+          return res.status(400).json({
+            error: 'Inventory must be pulled from the transfer origin location.'
+          });
+        }
+
+        const assignment = await assignInventoryToOrder({
+          connection,
+          company_id,
+          order,
+          blueprintItem: null,
+          inventoryRow,
+          quantity: qty,
+          note: notes || 'Manually added from transfer order'
+        });
+        insertedItemId = assignment?.transfer_order_item_id || null;
+      } else {
+        const [result] = await connection.query(
+          `INSERT INTO transfer_order_items (
+            transfer_order_id,
+            loadout_id,
+            inventory_id,
+            picked_inventory_id,
+            part_id,
+            lot_id,
+            quantity,
+            unit_of_measure,
+            serial_number,
+            expiration_date,
+            notes,
+            company_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            order.loadout_id || null,
+            null,
+            null,
+            part_id || null,
+            lot_id || null,
+            qty,
+            unit_of_measure || 'EA',
+            serial_number || null,
+            parseDateOrNull(expiration_date),
+            notes || null,
+            company_id
+          ]
+        );
+
+        insertedItemId = result.insertId;
+      }
+
+      await connection.commit();
 
       const items = await fetchOrderItems(company_id, id);
-      const newItem = items.find((itm) => itm.transfer_order_item_id === result.insertId);
+      let newItem = items.find((itm) => itm.transfer_order_item_id === insertedItemId);
+      if (!newItem && items.length) {
+        newItem = items[items.length - 1];
+      }
+
       return res.status(201).json(newItem || null);
     } catch (error) {
+      await connection.rollback();
       console.error('Error adding transfer order item:', error);
       return res.status(500).json({ error: 'Failed to add item' });
+    } finally {
+      connection.release();
     }
   }
 
@@ -980,11 +1581,17 @@ class TransferOrdersController {
 
       const [[inventoryRow]] = await exec(
         connection,
-        `SELECT 
+        `SELECT
           inv.*,
-          l.expiration_date
+          l.expiration_date,
+          b.aisle,
+          b.rack,
+          b.shelf,
+          b.bin,
+          b.zone
          FROM inventory inv
          LEFT JOIN lots l ON inv.lot_id = l.lot_id
+         LEFT JOIN bins b ON inv.bin_id = b.bin_id AND b.company_id = inv.company_id
          WHERE inv.inventory_id = ? AND inv.company_id = ?`,
         [Number(inventory_id), company_id]
       );
@@ -1029,6 +1636,7 @@ class TransferOrdersController {
   }
 
   async assignLoadout(req, res) {
+    const connection = await pool.getConnection();
     try {
       const company_id = req.user?.company_id;
       const orderId = Number(req.params.id);
@@ -1058,18 +1666,65 @@ class TransferOrdersController {
         });
       }
 
-      await pool.query(
+      // Verify loadout is at the source location
+      if (Number(loadout.location_id) !== Number(order.from_location_id)) {
+        return res.status(400).json({
+          error: 'Selected loadout must be at the transfer origin location'
+        });
+      }
+
+      await connection.beginTransaction();
+
+      // Update transfer order with loadout and blueprint
+      await connection.query(
         `UPDATE transfer_orders
          SET loadout_id = ?, blueprint_id = COALESCE(blueprint_id, ?), updated_at = NOW()
          WHERE transfer_order_id = ? AND company_id = ?`,
         [loadoutId, loadout.blueprint_id || null, orderId, company_id]
       );
 
+      // If loadout has a blueprint, auto-assign inventory from the blueprint
+      if (loadout.blueprint_id) {
+        // Get current assigned quantities
+        const [existingItems] = await connection.query(
+          `SELECT part_id, SUM(quantity) as total
+           FROM transfer_order_items
+           WHERE transfer_order_id = ? AND company_id = ?
+           GROUP BY part_id`,
+          [orderId, company_id]
+        );
+
+        const assignedQuantities = {};
+        existingItems.forEach(item => {
+          if (item.part_id) {
+            assignedQuantities[item.part_id] = Number(item.total) || 0;
+          }
+        });
+
+        // Auto-assign blueprint inventory
+        await autoAssignBlueprintInventory({
+          connection,
+          company_id,
+          blueprint_id: loadout.blueprint_id,
+          loadout_id: loadoutId,
+          transfer_order_id: orderId,
+          from_location_id: order.from_location_id,
+          transfer_order_number: order.transfer_order_number,
+          targetBlueprintItemId: null, // Assign all blueprint items
+          assignedQuantities
+        });
+      }
+
+      await connection.commit();
+
       const updated = await getOrderWithItems(company_id, orderId);
       return res.json({ success: true, order: updated });
     } catch (error) {
+      await connection.rollback();
       console.error('Error assigning loadout to transfer order:', error);
-      return res.status(500).json({ error: 'Failed to assign loadout' });
+      return res.status(500).json({ error: error.message || 'Failed to assign loadout' });
+    } finally {
+      connection.release();
     }
   }
 

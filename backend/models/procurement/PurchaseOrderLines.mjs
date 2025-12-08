@@ -49,10 +49,12 @@ export async function createPurchaseOrderLine(company_id, data = {}) {
     part_id,
     quantity_ordered,
     quantity_received = 0,
-    unit_cost,
+    unit_cost: incomingUnitCost,
+    unit_price,
     expected_delivery_date = null,
     notes = null,
   } = data;
+  const unit_cost = incomingUnitCost ?? unit_price ?? null;
 
   const [result] = await pool.query(
     `
@@ -83,10 +85,18 @@ export async function createPurchaseOrderLine(company_id, data = {}) {
  */
 export async function updatePurchaseOrderLine(company_id, po_line_id, patch = {}) {
   assertCompanyId(company_id);
-  const keys = Object.keys(patch);
+  const normalized = { ...patch };
+
+  // Frontend may send unit_price; map it to unit_cost for the DB
+  if ('unit_price' in normalized && normalized.unit_cost === undefined) {
+    normalized.unit_cost = normalized.unit_price;
+  }
+  delete normalized.unit_price;
+
+  const keys = Object.keys(normalized);
   if (!keys.length) return null;
   const setSql = keys.map((k) => `${k} = ?`).join(', ');
-  const values = [...Object.values(patch), company_id, po_line_id];
+  const values = [...Object.values(normalized), company_id, po_line_id];
 
   await pool.query(
     `UPDATE purchase_order_lines SET ${setSql}

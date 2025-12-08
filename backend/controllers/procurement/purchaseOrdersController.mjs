@@ -1,6 +1,7 @@
 // controllers/procurement/purchaseOrdersController.mjs
 import * as PurchaseOrders from '../../models/procurement/PurchaseOrders.mjs';
 import * as PurchaseOrderLines from '../../models/procurement/PurchaseOrderLines.mjs';
+import { getLatestPartCostForSupplier } from '../../models/procurement/PartCosts.mjs';
 
 /**
  * Convert JavaScript Date to MySQL DATETIME format
@@ -238,7 +239,45 @@ export async function addLine(req, res) {
     const { id } = req.params; // purchase_order_id
     const data = { ...req.body, purchase_order_id: id };
 
-    const newLineId = await PurchaseOrderLines.createPurchaseOrderLine(company_id, data);
+    // Ensure the PO exists and grab the supplier for cost lookup
+    const po = await PurchaseOrders.getPurchaseOrderById(company_id, id);
+    if (!po) {
+      return res.status(404).json({ error: 'Purchase order not found' });
+    }
+
+    // Normalize core fields
+    const part_id = data.part_id ? Number(data.part_id) : null;
+    if (!part_id) {
+      return res.status(400).json({ error: 'part_id is required' });
+    }
+    const quantity_ordered = Number(data.quantity_ordered) || 1;
+
+    // Prefer incoming unit_cost/unit_price; otherwise fall back to supplier-part cost
+    const incomingCost = data.unit_cost ?? data.unit_price;
+    let unit_cost = Number.isFinite(Number(incomingCost)) ? Number(incomingCost) : null;
+
+    if ((!unit_cost || unit_cost <= 0) && part_id && po.supplier_id) {
+      const supplierCost = await getLatestPartCostForSupplier({
+        company_id,
+        part_id,
+        supplier_id: po.supplier_id,
+      });
+
+      if (supplierCost?.unit_cost != null) {
+        unit_cost = Number(supplierCost.unit_cost);
+      }
+    }
+
+    if (!Number.isFinite(unit_cost)) {
+      unit_cost = 0;
+    }
+
+    const newLineId = await PurchaseOrderLines.createPurchaseOrderLine(company_id, {
+      ...data,
+      part_id,
+      quantity_ordered,
+      unit_cost,
+    });
     res.status(201).json({ message: 'Purchase order line added', po_line_id: newLineId });
   } catch (err) {
     console.error('Error adding purchase order line:', err);

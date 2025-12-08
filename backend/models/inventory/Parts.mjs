@@ -10,6 +10,7 @@ export const PART_COLUMNS = [
   'category',
   'subcategory',
   'default_supplier_id',
+  'preferred_bin_id',
   'lot_tracked',
   'serial_tracked',
   'expiration_required',
@@ -60,6 +61,11 @@ function normalizePatch(patch = {}) {
     out.default_supplier_id = null;
   }
 
+  // Bin cleanup (convert empty strings to null)
+  if ('preferred_bin_id' in out && (out.preferred_bin_id === '' || out.preferred_bin_id === undefined)) {
+    out.preferred_bin_id = null;
+  }
+
   return out;
 }
 
@@ -72,7 +78,7 @@ export async function getPartById(company_id, part_id) {
     `
     SELECT
       part_id, company_id, product_name, gtin, description, sku, udi_code,
-      category, subcategory, default_supplier_id,
+      category, subcategory, default_supplier_id, preferred_bin_id,
       lot_tracked, serial_tracked, expiration_required, temperature_sensitive,
       sterile_required, regulatory_class, reorder_point, reorder_quantity,
       unit_of_measure, weight, dimensions, is_active, created_at, updated_at
@@ -94,7 +100,7 @@ export async function getPartBySku(company_id, sku) {
     `
     SELECT
       part_id, company_id, product_name, gtin, description, sku, udi_code,
-      category, subcategory, default_supplier_id,
+      category, subcategory, default_supplier_id, preferred_bin_id,
       lot_tracked, serial_tracked, expiration_required, temperature_sensitive,
       sterile_required, regulatory_class, reorder_point, reorder_quantity,
       unit_of_measure, weight, dimensions, is_active, created_at, updated_at
@@ -122,7 +128,7 @@ export async function getParts({ company_id, limit = 50, offset = 0, includeInac
     `
     SELECT
       part_id, company_id, product_name, gtin, description, sku, udi_code,
-      category, subcategory, default_supplier_id,
+      category, subcategory, default_supplier_id, preferred_bin_id,
       lot_tracked, serial_tracked, expiration_required, temperature_sensitive,
       sterile_required, regulatory_class, reorder_point, reorder_quantity,
       unit_of_measure, weight, dimensions, is_active, created_at, updated_at
@@ -156,7 +162,7 @@ export async function searchParts({ company_id, q = '', limit = 50, offset = 0, 
     `
     SELECT
       part_id, company_id, product_name, gtin, description, sku, udi_code,
-      category, subcategory, default_supplier_id,
+      category, subcategory, default_supplier_id, preferred_bin_id,
       lot_tracked, serial_tracked, expiration_required, temperature_sensitive,
       sterile_required, regulatory_class, reorder_point, reorder_quantity,
       unit_of_measure, weight, dimensions, is_active, created_at, updated_at
@@ -306,7 +312,7 @@ export async function searchPartsAdvanced(opts = {}) {
     `
     SELECT
       part_id, company_id, product_name, gtin, description, sku, udi_code,
-      category, subcategory, default_supplier_id,
+      category, subcategory, default_supplier_id, preferred_bin_id,
       lot_tracked, serial_tracked, expiration_required, temperature_sensitive,
       sterile_required, regulatory_class, reorder_point, reorder_quantity,
       unit_of_measure, weight, dimensions, is_active, created_at, updated_at

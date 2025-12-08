@@ -38,7 +38,8 @@ import {
   listModulesHandler,
   createModuleHandler,
   listSubmodulesHandler,
-  createSubmoduleHandler
+  createSubmoduleHandler,
+  resetUserPasswordHandler
 } from '../controllers/admin/adminController.mjs';
 import {
   listCompanies as listCompaniesHandler,
@@ -77,6 +78,7 @@ router.get('/users/:id', getUserHandler);  // <-- Now properly imported
 router.post('/users', createUserHandler);
 router.put('/users/:id', updateUserHandler);
 router.put('/users/:id/super', setSuperAdminHandler);
+router.post('/users/:userId/reset-password', resetUserPasswordHandler);
 
 // Role Management
 router.get('/roles', getRoles);

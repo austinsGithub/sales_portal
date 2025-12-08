@@ -125,7 +125,12 @@ export async function create(req, res, next) {
 
     const created = await createSupplier(company_id, body);
     res.status(201).json(created);
-  } catch (e) { next(e); }
+  } catch (e) { 
+    if (e.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'Supplier code must be unique for this company.' });
+    }
+    next(e); 
+  }
 }
 
 export async function patch(req, res, next) {

@@ -14,16 +14,19 @@ import permissionRoutes from './routes/permissionRoutes.mjs';
 import supplierRoutes from './routes/procurement/supplierRoutes.mjs';
 import receivingRoutes from './routes/procurement/receivingRoutes.mjs';
 import purchaseOrdersRoutes from './routes/procurement/purchaseOrdersRoutes.mjs';
+import partCostsRoutes from './routes/procurement/partCostsRoutes.mjs';
 
 // Inventory Module
 import partsRoutes from './routes/inventory/partsRoutes.mjs';
 import inventoryRoutes from './routes/inventory/inventoryRoutes.mjs';
 import productsRoutes from './routes/inventory/productsRoutes.mjs';
+import productCategoriesRoutes from './routes/inventory/productCategoriesRoutes.mjs';
 import containerBlueprintsRoutes from './routes/inventory/containerBlueprintsRoutes.mjs';
 import containerLoadoutsRoutes from './routes/inventory/containerLoadouts.mjs';
 import locationsRoutes from './routes/inventory/LocationsRoutes.mjs';
 import locationGroupsRoutes from './routes/inventory/LocationGroupsRoutes.mjs';
 import transferOrdersRoutes from './routes/inventory/transferOrdersRoutes.mjs';
+import binsRoutes from './routes/inventory/binsRoutes.mjs';
 import adminRoutes from './routes/adminRoutes.mjs';
 
 // ---------- SERVER CONFIG ----------
@@ -50,16 +53,19 @@ server.use('/api/permissions', permissionRoutes);
 server.use('/api/procurement/suppliers', supplierRoutes);
 server.use('/api/procurement/receiving', receivingRoutes);
 server.use('/api/procurement/purchase_orders', purchaseOrdersRoutes);
+server.use('/api/procurement/part-costs', partCostsRoutes);
 
 // Inventory APIs
 server.use('/api/inventory/parts', partsRoutes);
 server.use('/api/inventory/items', inventoryRoutes);
 server.use('/api/inventory/products', productsRoutes);
+server.use('/api/inventory/product-categories', productCategoriesRoutes);
 server.use('/api/inventory/container_blueprints', containerBlueprintsRoutes);
 server.use('/api/inventory/container_loadouts', containerLoadoutsRoutes);
 server.use('/api/inventory/locations', locationsRoutes);
 server.use('/api/inventory/location-groups', locationGroupsRoutes);
 server.use('/api/inventory/transfer-orders', transferOrdersRoutes);
+server.use('/api/inventory/bins', binsRoutes);
 
 // Temporary alias to support legacy frontend paths
 server.use('/api/transfer-orders', transferOrdersRoutes);

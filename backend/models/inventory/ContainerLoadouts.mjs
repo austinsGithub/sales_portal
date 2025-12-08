@@ -94,12 +94,11 @@ export const ContainerLoadoutsModel = {
     if (q) {
       sql += ` AND (
         cl.serial_suffix LIKE ? OR 
-        cl.status LIKE ? OR
         cb.blueprint_name LIKE ? OR
         CONCAT(COALESCE(cb.serial_number_prefix, ''), COALESCE(cl.serial_suffix, '')) LIKE ?
       )`;
       const qWildcard = `%${q}%`;
-      params.push(qWildcard, qWildcard, qWildcard, qWildcard);
+      params.push(qWildcard, qWildcard, qWildcard);
     }
 
     const [[{ total }]] = await pool.query(sql, params);

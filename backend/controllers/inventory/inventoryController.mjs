@@ -10,12 +10,13 @@ export async function getInventory(req, res) {
     const { partId } = req.params;
 
     const [inventory] = await pool.query(
-      `SELECT 
+      `SELECT
         i.inventory_id,
         i.part_id,
         i.lot_id,
         i.supplier_id,
         i.location_id,
+        i.bin_id,
         i.quantity_on_hand,
         i.quantity_available,
         i.quantity_reserved,
@@ -30,6 +31,11 @@ export async function getInventory(req, res) {
         l.expiration_date AS expiration_date,
         s.supplier_name,
         loc.location_name,
+        b.aisle,
+        b.rack,
+        b.shelf,
+        b.bin,
+        b.zone,
         CASE
           WHEN l.expiration_date < CURDATE() THEN 'Expired'
           WHEN l.expiration_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
@@ -41,7 +47,8 @@ export async function getInventory(req, res) {
       LEFT JOIN lots l ON i.lot_id = l.lot_id
       LEFT JOIN suppliers s ON i.supplier_id = s.supplier_id
       LEFT JOIN locations loc ON i.location_id = loc.location_id
-      WHERE i.part_id = ? 
+      LEFT JOIN bins b ON i.bin_id = b.bin_id AND b.company_id = i.company_id
+      WHERE i.part_id = ?
         AND i.company_id = ?
       ORDER BY l.expiration_date ASC`,
       [partId, company_id]
@@ -65,6 +72,90 @@ export async function getInventory(req, res) {
 }
 
 /**
+ * Get inventory constrained to a single location (used by transfer orders)
+ * Requires locationId and returns only rows for that location with available stock
+ */
+export async function getInventoryByLocation(req, res) {
+  try {
+    const { company_id } = req.user;
+    const locationId = Number(req.params.locationId || req.query.locationId);
+
+    if (!Number.isFinite(locationId)) {
+      return res.status(400).json({ error: 'locationId is required' });
+    }
+
+    const { limit = 400, offset = 0, q } = req.query;
+
+    let sql = `
+      SELECT
+        i.inventory_id,
+        i.part_id,
+        i.lot_id,
+        i.supplier_id,
+        i.location_id,
+        i.bin_id,
+        i.quantity_on_hand,
+        i.quantity_available,
+        i.quantity_reserved,
+        i.quantity_on_order,
+        i.serial_number,
+        i.received_date,
+        i.is_active,
+        p.product_name,
+        p.sku,
+        p.gtin,
+        l.lot_number,
+        l.expiration_date,
+        s.supplier_name,
+        loc.location_name,
+        b.aisle,
+        b.rack,
+        b.shelf,
+        b.bin,
+        b.zone,
+        GREATEST(
+          IFNULL(i.quantity_available, i.quantity_on_hand - IFNULL(i.quantity_reserved, 0)),
+          0
+        ) AS computed_available
+      FROM inventory i
+      LEFT JOIN parts p ON i.part_id = p.part_id
+      LEFT JOIN lots l ON i.lot_id = l.lot_id
+      LEFT JOIN suppliers s ON i.supplier_id = s.supplier_id
+      LEFT JOIN locations loc ON i.location_id = loc.location_id
+      LEFT JOIN bins b ON i.bin_id = b.bin_id AND b.company_id = i.company_id
+      WHERE i.company_id = ?
+        AND i.location_id = ?
+    `;
+
+    const params = [company_id, locationId];
+
+    if (q) {
+      sql += ` AND (
+        p.product_name LIKE ? OR 
+        p.sku LIKE ? OR 
+        p.gtin LIKE ? OR
+        l.lot_number LIKE ? OR
+        i.serial_number LIKE ?
+      )`;
+      const term = `%${q}%`;
+      params.push(term, term, term, term, term);
+    }
+
+    sql += `
+      ORDER BY p.product_name ASC
+      LIMIT ? OFFSET ?
+    `;
+    params.push(Number(limit), Number(offset));
+
+    const [rows] = await pool.query(sql, params);
+    return res.json(rows);
+  } catch (error) {
+    console.error('Error fetching inventory by location:', error);
+    return res.status(500).json({ error: 'Failed to fetch inventory for location' });
+  }
+}
+
+/**
  * Get inventory by product ID
  * Follows product → part → inventory → lot chain
  */
@@ -75,12 +166,13 @@ export async function getInventoryByProduct(req, res) {
 
     const [rows] = await pool.query(
       `
-      SELECT 
+      SELECT
         i.inventory_id,
         i.part_id,
         i.lot_id,
         i.supplier_id,
         i.location_id,
+        i.bin_id,
         i.quantity_on_hand,
         i.quantity_available,
         i.quantity_reserved,
@@ -97,6 +189,11 @@ export async function getInventoryByProduct(req, res) {
         l.expiration_date AS expiration_date,
         s.supplier_name,
         loc.location_name,
+        b.aisle,
+        b.rack,
+        b.shelf,
+        b.bin,
+        b.zone,
         CASE
           WHEN l.expiration_date < CURDATE() THEN 'Expired'
           WHEN l.expiration_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
@@ -109,6 +206,7 @@ export async function getInventoryByProduct(req, res) {
       LEFT JOIN lots l ON i.lot_id = l.lot_id
       LEFT JOIN suppliers s ON i.supplier_id = s.supplier_id
       LEFT JOIN locations loc ON i.location_id = loc.location_id
+      LEFT JOIN bins b ON i.bin_id = b.bin_id AND b.company_id = i.company_id
       WHERE p.product_id = ?
         AND i.company_id = ?
         AND i.quantity_available > 0
@@ -142,12 +240,13 @@ export async function getAllInventory(req, res) {
     } = req.query;
 
     let sql = `
-      SELECT 
+      SELECT
         i.inventory_id,
         i.part_id,
         i.lot_id,
         i.supplier_id,
         i.location_id,
+        i.bin_id,
         i.quantity_on_hand,
         i.quantity_available,
         i.quantity_reserved,
@@ -165,6 +264,11 @@ export async function getAllInventory(req, res) {
         s.supplier_name,
         loc.location_name,
         lg.group_name AS warehouse_name,
+        b.aisle,
+        b.rack,
+        b.shelf,
+        b.bin,
+        b.zone,
         CASE
           WHEN l.expiration_date < CURDATE() THEN 'Expired'
           WHEN l.expiration_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
@@ -177,6 +281,7 @@ export async function getAllInventory(req, res) {
       LEFT JOIN suppliers s ON i.supplier_id = s.supplier_id
       LEFT JOIN locations loc ON i.location_id = loc.location_id
       LEFT JOIN location_groups lg ON loc.location_group_id = lg.group_id
+      LEFT JOIN bins b ON i.bin_id = b.bin_id AND b.company_id = i.company_id
       WHERE i.company_id = ?
     `;
 

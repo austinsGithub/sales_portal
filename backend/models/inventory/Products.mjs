@@ -7,7 +7,6 @@ export const PRODUCT_COLUMNS = [
   'public_sku',
   'base_price',
   'description',
-  'product_category',
   'is_active'
 ];
 
@@ -58,9 +57,9 @@ export async function searchProducts({ company_id, q = '', limit = 50, offset = 
   const like = `%${q}%`;
   const where = [
     'company_id = ?',
-    '(product_name LIKE ? OR public_sku LIKE ? OR product_category LIKE ? OR description LIKE ?)'
+    '(product_name LIKE ? OR public_sku LIKE ? OR description LIKE ?)'
   ];
-  const args = [company_id, like, like, like, like];
+  const args = [company_id, like, like, like];
   if (!includeInactive) where.push('is_active = 1');
   args.push(Number(limit), Number(offset));
 
@@ -99,7 +98,11 @@ export async function updateProduct(company_id, product_id, patch = {}) {
   const params = [...values, company_id, product_id];
 
   const [res] = await pool.query(sql, params);
-  if (res.affectedRows === 0) return null;
+  // If nothing changed, still return the current row so the caller doesn't 404.
+  if (res.affectedRows === 0) {
+    const current = await getProductById(company_id, product_id);
+    return current;
+  }
   return getProductById(company_id, product_id);
 }
 
@@ -129,7 +132,6 @@ export async function searchProductsAdvanced({
   limit = 50,
   offset = 0,
   includeInactive = false,
-  product_category,
   min_base_price,
   max_base_price,
 } = {}) {
@@ -138,12 +140,11 @@ export async function searchProductsAdvanced({
   const args = [company_id];
 
   if (q) {
-    where.push('(product_name LIKE ? OR public_sku LIKE ? OR description LIKE ? OR product_category LIKE ?)');
+    where.push('(product_name LIKE ? OR public_sku LIKE ? OR description LIKE ?)');
     const like = `%${q}%`;
-    args.push(like, like, like, like);
+    args.push(like, like, like);
   }
   if (!includeInactive) where.push('is_active = 1');
-  if (product_category) { where.push('product_category LIKE ?'); args.push(`%${product_category}%`); }
   if (min_base_price) { where.push('base_price >= ?'); args.push(Number(min_base_price)); }
   if (max_base_price) { where.push('base_price <= ?'); args.push(Number(max_base_price)); }
 

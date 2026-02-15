@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -457,16 +457,17 @@ const TransferOrderDetails = ({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="to-detail-loading">
+        <div className="to-spinner" />
+        <p>Loading order details...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-800">{error}</p>
+      <div className="inline-alert error" style={{ margin: '1.5rem' }}>
+        <p>{error}</p>
       </div>
     );
   }
@@ -1263,9 +1264,12 @@ const TransferOrderDetails = ({
 
         {/* Notes */}
         {order.notes && (
-          <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-            <h3 className="text-sm font-medium text-yellow-900 mb-2">Notes</h3>
-            <p className="text-gray-700 whitespace-pre-wrap">{order.notes}</p>
+          <div className="details-note-card" style={{ borderLeftColor: '#f59e0b', background: '#fffbeb' }}>
+            <div className="details-note-header" style={{ color: '#92400e' }}>
+              <AlertCircle size={16} />
+              <span>Notes</span>
+            </div>
+            <p style={{ margin: 0, color: '#374151', whiteSpace: 'pre-wrap' }}>{order.notes}</p>
           </div>
         )}
 

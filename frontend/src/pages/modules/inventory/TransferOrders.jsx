@@ -1,14 +1,12 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import axios from 'axios';
 import {
   PlusCircle,
   RefreshCw,
-  MapPin,
   Package,
   Search,
   Layers,
-  ChevronRight,
-  X
+  ChevronRight
 } from 'lucide-react';
 import CreateTransferOrder from './CreateTransferOrder.jsx';
 import TransferOrderDetails from './TransferOrderDetails.jsx';
@@ -39,6 +37,8 @@ const STATUS_FILTERS = [
   { id: 'Cancelled', label: 'Cancelled' }
 ];
 
+const PAGE_SIZE = 25;
+
 const TransferOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,24 +49,21 @@ const TransferOrders = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [assigningOrder, setAssigningOrder] = useState(null);
   const [detailRefreshToken, setDetailRefreshToken] = useState(0);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
   const [totalOrders, setTotalOrders] = useState(0);
 
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const offset = (currentPage - 1) * pageSize;
+      const offset = (currentPage - 1) * PAGE_SIZE;
       const { data } = await axios.get(`${API_BASE}/api/inventory/transfer-orders`, {
         params: {
           ...(statusFilter ? { status: statusFilter } : {}),
-          limit: pageSize,
-          offset: offset
+          limit: PAGE_SIZE,
+          offset
         }
       });
 
-      // Handle both old format (array) and new format (object with data and pagination)
       if (Array.isArray(data)) {
         setOrders(data);
         setTotalOrders(data.length);
@@ -83,53 +80,31 @@ const TransferOrders = () => {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, currentPage, pageSize]);
+  }, [statusFilter, currentPage]);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
-  // Reset to page 1 when filter changes
   useEffect(() => {
     setCurrentPage(1);
   }, [statusFilter]);
 
-  useEffect(() => {
-    if (!isDetailOpen) return;
-    if (!selectedOrderId) {
-      setIsDetailOpen(false);
-      return;
-    }
-
-    const exists = orders.some((o) => o.transfer_order_id === selectedOrderId);
-    if (!exists) {
-      if (orders.length > 0) {
-        setSelectedOrderId(orders[0].transfer_order_id);
-      } else {
-        setIsDetailOpen(false);
-        setSelectedOrderId(null);
-      }
-    }
-  }, [orders, isDetailOpen, selectedOrderId]);
-
   const filteredOrders = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return orders.filter((order) => {
-      const matchesStatus = statusFilter ? order.status === statusFilter : true;
-      const matchesTerm = term
-        ? [
-            order.transfer_order_number,
-            order.from_location_name,
-            order.to_location_name,
-            order.blueprint_name,
-            order.loadout_serial_suffix,
-            order.priority,
-            order.status
-          ].some((value) => (value || '').toString().toLowerCase().includes(term))
-        : true;
-      return matchesStatus && matchesTerm;
-    });
-  }, [orders, searchTerm, statusFilter]);
+    if (!term) return orders;
+    return orders.filter((order) =>
+      [
+        order.transfer_order_number,
+        order.from_location_name,
+        order.to_location_name,
+        order.blueprint_name,
+        order.loadout_serial_suffix,
+        order.priority,
+        order.status
+      ].some((value) => (value || '').toString().toLowerCase().includes(term))
+    );
+  }, [orders, searchTerm]);
 
   const handleOrderCreated = () => {
     setShowCreateModal(false);
@@ -151,182 +126,193 @@ const TransferOrders = () => {
     setDetailRefreshToken((token) => token + 1);
   };
 
-  const openDetails = (orderId) => {
+  const handleSelectOrder = (orderId) => {
     setSelectedOrderId(orderId);
-    setIsDetailOpen(true);
   };
 
-  const closeDetails = () => {
-    setIsDetailOpen(false);
-  };
-
+  const totalPages = Math.ceil(totalOrders / PAGE_SIZE);
   const isSearching = searchTerm.trim().length > 0;
-  const isFiltering = Boolean(statusFilter);
-  const listIsEmpty = !loading && filteredOrders.length === 0;
+  const pageStart = totalOrders ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const pageEnd = Math.min(currentPage * PAGE_SIZE, totalOrders);
 
   return (
-    <div className="transfer-orders-page modern">
-      <header className="orders-list-header">
+    <div className="to-page">
+      {/* Page Header */}
+      <div className="to-page-header">
         <div>
-          <p className="eyebrow">Inventory Moves</p>
           <h1>Transfer Orders</h1>
+          <p className="to-subtitle">Move inventory between locations</p>
         </div>
-        <div className="orders-header-actions">
-          <button className="ghost-btn" onClick={fetchOrders} disabled={loading}>
+        <div className="to-header-actions">
+          <button className="to-btn to-btn-ghost" onClick={fetchOrders} disabled={loading}>
             <RefreshCw size={16} /> Refresh
           </button>
-          <button className="primary-btn" onClick={() => setShowCreateModal(true)}>
+          <button className="to-btn to-btn-primary" onClick={() => setShowCreateModal(true)}>
             <PlusCircle size={18} /> New Order
           </button>
         </div>
-      </header>
-
-      <div className="orders-toolbar">
-        <div className="search-input-wrapper">
-          <Search size={16} aria-hidden="true" />
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search order #, location, blueprint…"
-          />
-          {searchTerm && (
-            <button className="search-clear" onClick={() => setSearchTerm('')} aria-label="Clear search">
-              ×
-            </button>
-          )}
-        </div>
-        <div className="toolbar-count">{filteredOrders.length} results</div>
       </div>
 
-      <div className="orders-status-filter">
-        {STATUS_FILTERS.map((status) => {
-          const active = statusFilter === status.id;
-          const count = status.id
-            ? orders.filter((order) => order.status === status.id).length
-            : orders.length;
-          return (
-            <button
-              key={status.id || 'all'}
-              className={`status-filter-pill ${active ? 'active' : ''}`}
-              onClick={() => setStatusFilter(status.id)}
-            >
-              <span>{status.label}</span>
-              <span className="count">{count}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {error && (
-        <div className="inline-alert error compact">{error}</div>
-      )}
-
-      <div className="orders-table-card">
-        {loading ? (
-          <div className="orders-placeholder">
-            <div className="spinner" />
-            <p>Loading transfer orders...</p>
+      {/* Main Content - List & Pane */}
+      <div className="to-content">
+        {/* Left Panel - Orders List */}
+        <div className="to-list-panel">
+          <div className="to-panel-header">
+            <h2>Orders</h2>
+            <span className="to-panel-count">{filteredOrders.length} results</span>
           </div>
-        ) : listIsEmpty ? (
-          <div className="orders-placeholder">
-            <Layers size={32} />
-            {isSearching || isFiltering ? (
-              <>
-                <h3>No matches</h3>
-                <p>Try adjusting your search or status filters.</p>
-              </>
+
+          {/* Search */}
+          <div className="to-search-area">
+            <div className="to-search-box">
+              <Search size={16} />
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search order #, location..."
+              />
+              {searchTerm && (
+                <button className="to-search-clear" onClick={() => setSearchTerm('')}>
+                  &times;
+                </button>
+              )}
+            </div>
+
+            {/* Status Filter */}
+            <select
+              className="to-status-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              {STATUS_FILTERS.map((s) => (
+                <option key={s.id || 'all'} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Orders List */}
+          <div className="to-list">
+            {loading ? (
+              <div className="to-list-empty">
+                <div className="to-spinner" />
+                <p>Loading...</p>
+              </div>
+            ) : error ? (
+              <div className="to-list-empty">
+                <p style={{ color: '#b91c1c' }}>{error}</p>
+              </div>
+            ) : filteredOrders.length === 0 ? (
+              <div className="to-list-empty">
+                <Layers size={40} style={{ opacity: 0.4 }} />
+                {isSearching ? (
+                  <p>No matches found</p>
+                ) : (
+                  <p>No transfer orders</p>
+                )}
+              </div>
             ) : (
-              <>
-                <h3>No transfer orders</h3>
-                <p>Use the New Order button to move inventory between locations.</p>
-              </>
+              filteredOrders.map((order) => {
+                const isSelected = selectedOrderId === order.transfer_order_id;
+                return (
+                  <div
+                    key={order.transfer_order_id}
+                    className={`to-list-item ${isSelected ? 'selected' : ''}`}
+                    onClick={() => handleSelectOrder(order.transfer_order_id)}
+                  >
+                    <div className="to-list-item-top">
+                      <span className="to-list-item-number">
+                        {order.transfer_order_number}
+                      </span>
+                      <span className={statusClasses[order.status] || 'status-pill'}>
+                        {order.status}
+                      </span>
+                    </div>
+                    <div className="to-list-item-route">
+                      <span>{order.from_location_name || '—'}</span>
+                      <ChevronRight size={12} />
+                      <span>{order.to_location_name || '—'}</span>
+                    </div>
+                    <div className="to-list-item-meta">
+                      {order.blueprint_name && (
+                        <span className="to-meta-chip">{order.blueprint_name}</span>
+                      )}
+                      {order.loadout_serial_suffix && (
+                        <span className="to-meta-chip to-meta-chip-loadout">
+                          <Package size={12} />
+                          {order.loadout_serial_suffix}
+                        </span>
+                      )}
+                      <span className="to-list-item-date">
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
-        ) : (
-          <>
-            <div className="orders-table-wrapper">
-              <table className="orders-table">
-            <thead>
-              <tr>
-                <th>Transfer Order</th>
-                <th>Route</th>
-                <th>Blueprint</th>
-                <th>Loadout</th>
-                <th>Total Items</th>
-                <th>Created</th>
-                <th>Status</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order) => (
-                  <tr
-                    key={order.transfer_order_id}
-                    onClick={() => openDetails(order.transfer_order_id)}
-                  >
-                    <td>
-                      <div className="order-col-main">
-                        <strong>{order.transfer_order_number}</strong>
-                        <span>Priority {order.priority || 'Medium'}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="order-route">
-                        <span>{order.from_location_name || '—'}</span>
-                        <ChevronRight size={12} />
-                        <span>{order.to_location_name || '—'}</span>
-                      </div>
-                    </td>
-                    <td>{order.blueprint_name || '—'}</td>
-                    <td>
-                      <span className={`loadout-chip ${order.loadout_serial_suffix ? '' : 'empty'}`}>
-                        <Package size={14} />
-                        {order.loadout_serial_suffix || 'Unassigned'}
-                      </span>
-                    </td>
-                    <td>{order.total_items ?? '—'}</td>
-                    <td>
-                      {new Date(order.created_at).toLocaleDateString()}<br />
-                      <small>
-                        {[order.created_by_first_name, order.created_by_last_name].filter(Boolean).join(' ') || 'User'}
-                      </small>
-                    </td>
-                    <td>
-                      <span className={statusClasses[order.status] || 'status-pill'}>
-                        {order.status || 'Pending'}
-                      </span>
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="table-link"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDetails(order.transfer_order_id);
-                        }}
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-              ))}
-            </tbody>
-          </table>
+
+          {/* Pagination */}
+          {!isSearching && totalPages > 0 && (
+            <div className="to-pagination">
+              <div className="to-pagination-info">
+                {totalOrders > 0
+                  ? `${pageStart}-${pageEnd} of ${totalOrders}`
+                  : '0 results'}
+              </div>
+              <div className="to-pagination-controls">
+                <button
+                  className="to-pagination-btn"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1 || loading}
+                >
+                  Prev
+                </button>
+                <span className="to-pagination-page">
+                  {currentPage} / {totalPages || 1}
+                </span>
+                <button
+                  className="to-pagination-btn"
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  disabled={currentPage >= totalPages || loading}
+                >
+                  Next
+                </button>
+              </div>
             </div>
-            <Pagination
-              currentPage={currentPage}
-              totalItems={totalOrders}
-              pageSize={pageSize}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={(newSize) => {
-                setPageSize(newSize);
-                setCurrentPage(1);
+          )}
+        </div>
+
+        {/* Right Panel - Detail Pane */}
+        <div className="to-detail-panel">
+          {!selectedOrderId ? (
+            <div className="to-detail-empty">
+              <Package size={56} style={{ color: '#9ca3af', opacity: 0.5 }} />
+              <h3>Select a Transfer Order</h3>
+              <p>Choose an order from the list to view details and manage the workflow</p>
+            </div>
+          ) : (
+            <TransferOrderDetails
+              orderId={selectedOrderId}
+              refreshToken={detailRefreshToken}
+              onUpdate={handleDetailUpdated}
+              onClose={() => setSelectedOrderId(null)}
+              onRequestLoadoutChange={(detailOrder) => {
+                const row = orders.find(
+                  (o) => o.transfer_order_id === detailOrder.transfer_order_id
+                );
+                const base = row || {};
+                setAssigningOrder({ ...base, ...detailOrder });
               }}
             />
-          </>
-        )}
+          )}
+        </div>
       </div>
+
+      {/* Create Modal */}
       {showCreateModal && (
         <CreateTransferOrder
           onClose={() => setShowCreateModal(false)}
@@ -334,41 +320,7 @@ const TransferOrders = () => {
         />
       )}
 
-      {isDetailOpen && selectedOrderId && (
-        <div
-          className="transfer-order-details-overlay"
-          role="presentation"
-          onClick={closeDetails}
-        >
-          <div
-            className="transfer-order-details-panel"
-            role="dialog"
-            aria-modal="true"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              className="mobile-details-close"
-              type="button"
-              aria-label="Close details"
-              onClick={closeDetails}
-            >
-              <X size={18} />
-            </button>
-            <TransferOrderDetails
-              orderId={selectedOrderId}
-              refreshToken={detailRefreshToken}
-              onUpdate={handleDetailUpdated}
-              onClose={closeDetails}
-              onRequestLoadoutChange={(detailOrder) => {
-                const row = orders.find((o) => o.transfer_order_id === detailOrder.transfer_order_id);
-                const base = row || {};
-                setAssigningOrder({ ...base, ...detailOrder });
-              }}
-            />
-          </div>
-        </div>
-      )}
-
+      {/* Assign Loadout Modal */}
       {assigningOrder && (
         <AssignLoadoutModal
           order={assigningOrder}
@@ -376,98 +328,6 @@ const TransferOrders = () => {
           onAssigned={handleAssignSuccess}
         />
       )}
-    </div>
-  );
-};
-
-const Pagination = ({ currentPage, totalItems, pageSize, onPageChange, onPageSizeChange }) => {
-  const totalPages = Math.ceil(totalItems / pageSize);
-
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxVisible = 7;
-
-    if (totalPages <= maxVisible) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      if (currentPage <= 4) {
-        for (let i = 1; i <= 5; i++) pages.push(i);
-        pages.push('...');
-        pages.push(totalPages);
-      } else if (currentPage >= totalPages - 3) {
-        pages.push(1);
-        pages.push('...');
-        for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
-      } else {
-        pages.push(1);
-        pages.push('...');
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
-        pages.push('...');
-        pages.push(totalPages);
-      }
-    }
-
-    return pages;
-  };
-
-  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1;
-  const endItem = Math.min(currentPage * pageSize, totalItems);
-
-  return (
-    <div className="orders-pagination">
-      <div className="pagination-info">
-        Showing {startItem} to {endItem} of {totalItems} orders
-      </div>
-
-      <div className="pagination-controls">
-        <button
-          className="pagination-button"
-          onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          aria-label="Previous page"
-        >
-          Previous
-        </button>
-
-        {getPageNumbers().map((page, index) => (
-          page === '...' ? (
-            <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
-          ) : (
-            <button
-              key={page}
-              className={`pagination-button ${currentPage === page ? 'active' : ''}`}
-              onClick={() => onPageChange(page)}
-            >
-              {page}
-            </button>
-          )
-        ))}
-
-        <button
-          className="pagination-button"
-          onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages || totalPages === 0}
-          aria-label="Next page"
-        >
-          Next
-        </button>
-      </div>
-
-      <div className="pagination-page-size">
-        <label htmlFor="page-size">Per page:</label>
-        <select
-          id="page-size"
-          value={pageSize}
-          onChange={(e) => onPageSizeChange(Number(e.target.value))}
-        >
-          <option value={10}>10</option>
-          <option value={25}>25</option>
-          <option value={50}>50</option>
-          <option value={100}>100</option>
-        </select>
-      </div>
     </div>
   );
 };
@@ -549,7 +409,6 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
         }
       );
       setSuccess('Loadout assigned');
-      // brief delay so user sees confirmation
       setTimeout(() => {
         if (onAssigned) onAssigned();
         if (onClose) onClose();
@@ -563,9 +422,6 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
         err.message ||
         'Failed to assign loadout';
       setError(typeof apiMessage === 'string' ? apiMessage : 'Failed to assign loadout');
-      if (typeof apiMessage === 'string' && apiMessage) {
-        alert(`Assign failed: ${apiMessage}`);
-      }
     } finally {
       setAssigningId(null);
     }
@@ -585,7 +441,7 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
             </p>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close">
-            ×
+            &times;
           </button>
         </div>
 
@@ -602,7 +458,7 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
                 type="search"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search loadout ID, container, or location…"
+                placeholder="Search loadout ID, container, or location..."
               />
             </div>
 
@@ -612,7 +468,7 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
             {loading ? (
               <div className="assign-loadout-loading">
                 <div className="spinner" />
-                <p>Loading loadouts…</p>
+                <p>Loading loadouts...</p>
               </div>
             ) : loadouts.length === 0 ? (
               <div className="assign-loadout-empty">
@@ -638,7 +494,7 @@ const AssignLoadoutModal = ({ order, onClose, onAssigned }) => {
                       onClick={() => handleAssign(loadout.loadout_id)}
                       disabled={assigningId === loadout.loadout_id}
                     >
-                      {assigningId === loadout.loadout_id ? 'Assigning…' : 'Assign'}
+                      {assigningId === loadout.loadout_id ? 'Assigning...' : 'Assign'}
                     </button>
                   </div>
                 ))}

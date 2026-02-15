@@ -45,20 +45,42 @@
   min-height: 0;
 }
 
-.loadout-list-item h3 {
-  margin: 0 0 0.25rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--workspace-ink);
+.loadout-list-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.loadout-list-item p {
+.loadouts-layout .list-item-title {
   margin: 0;
-  font-size: 0.83rem;
-  color: var(--workspace-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--workspace-ink);
+  line-height: 1.3;
+}
+
+.loadouts-layout .list-item-meta {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 0.2rem;
+  gap: 0.35rem;
+}
+
+.loadouts-layout .list-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.loadouts-layout .list-chip.subtle {
+  background: #f8fafc;
+  color: #64748b;
 }
 
 .loadout-add-btn {
@@ -175,6 +197,17 @@
   gap: 1rem;
 }
 
+.loadout-form-card {
+  padding: 1.25rem 1.75rem 1.5rem;
+}
+
+.loadout-form-card > h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1.65rem;
+  line-height: 1.1;
+  color: #0f172a;
+}
+
 .loadout-form-field {
   display: flex;
   flex-direction: column;
@@ -203,6 +236,8 @@
   justify-content: flex-end;
   gap: 0.75rem;
   margin-top: 1.25rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #e5e7eb;
   flex-wrap: wrap;
 }
 
@@ -536,5 +571,209 @@
 
   .lot-assignment-form {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Lot Pick Stepped UI ── */
+
+.lot-pick-container {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.lot-pick-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.lot-pick-crumb {
+  background: none;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: default;
+}
+
+.lot-pick-crumb.clickable {
+  color: #3b82f6;
+  cursor: pointer;
+}
+
+.lot-pick-crumb.clickable:hover {
+  background: #eff6ff;
+}
+
+.lot-pick-crumb.active {
+  color: #0f172a;
+  background: rgba(17, 17, 23, 0.06);
+}
+
+.lot-pick-sep {
+  color: #cbd5e1;
+  font-weight: 400;
+  user-select: none;
+}
+
+.lot-pick-cancel {
+  margin-left: auto;
+}
+
+.lot-pick-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.lot-pick-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f8f9fc;
+  border: 1px solid #d9deea;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+}
+
+.lot-pick-search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.875rem;
+  flex: 1;
+  color: #0f172a;
+}
+
+.lot-pick-search input::placeholder {
+  color: #94a3b8;
+}
+
+.lot-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+
+.lot-pick-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.lot-pick-card:hover {
+  border-color: #0f172a;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.lot-pick-card.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.lot-pick-card strong {
+  font-size: 0.875rem;
+  color: #0f172a;
+}
+
+.lot-pick-card span {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.lot-pick-card-all {
+  border-style: dashed;
+  border-color: #cbd5e1;
+}
+
+.lot-pick-card-all:hover {
+  border-color: #94a3b8;
+  border-style: solid;
+}
+
+.lot-pick-zone {
+  font-size: 0.72rem;
+  color: #8b5cf6;
+  font-weight: 500;
+}
+
+.lot-pick-exp {
+  font-size: 0.72rem;
+  color: #d97706;
+}
+
+.lot-pick-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.lot-pick-assign-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.lot-pick-assign-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+}
+
+.lot-pick-assign-info strong {
+  font-size: 0.875rem;
+  color: #0f172a;
+}
+
+.lot-pick-assign-qty {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.lot-pick-assign-qty label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.lot-pick-assign-qty input {
+  width: 70px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .lot-pick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lot-pick-assign-bar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

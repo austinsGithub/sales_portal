@@ -703,7 +703,7 @@ export default function ContainerLoadouts() {
     };
 
     return (
-      <div className="loadout-detail-card">
+      <div className="loadout-detail-card loadout-form-card">
         <h2>Edit Loadout</h2>
 
         <div className="loadout-form-grid">
@@ -736,7 +736,7 @@ export default function ContainerLoadouts() {
     );
   };
 
-  const LoadoutItems = ({ loadoutId, blueprintId, loadoutLocationId }) => {
+  const LoadoutItems = ({ loadoutId, blueprintId }) => {
     const [blueprintItems, setBlueprintItems] = useState([]);
     const [assignedLots, setAssignedLots] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -746,6 +746,12 @@ export default function ContainerLoadouts() {
       lot_id: '',
       quantity_used: 1
     });
+    const [selectedLocationId, setSelectedLocationId] = useState('');
+    const [selectedBinId, setSelectedBinId] = useState('');
+    const [assignStep, setAssignStep] = useState('warehouse');
+    const [warehouseSearch, setWarehouseSearch] = useState('');
+    const [binSearch, setBinSearch] = useState('');
+    const [lotSearch, setLotSearch] = useState('');
 
     const getRequiredQuantity = (item) =>
       item?.default_quantity ||
@@ -774,8 +780,20 @@ export default function ContainerLoadouts() {
         const remaining = getRemainingQuantity(assigningToItem) || 1;
         const safeQty = Math.max(1, Math.min(defaultQty, remaining));
         setSelectedLot({ lot_id: '', quantity_used: safeQty });
+        setSelectedLocationId('');
+        setSelectedBinId('');
+        setAssignStep('warehouse');
+        setWarehouseSearch('');
+        setBinSearch('');
+        setLotSearch('');
       } else {
         setSelectedLot({ lot_id: '', quantity_used: 1 });
+        setSelectedLocationId('');
+        setSelectedBinId('');
+        setAssignStep('warehouse');
+        setWarehouseSearch('');
+        setBinSearch('');
+        setLotSearch('');
       }
     }, [assigningToItem, assignedLots]);
 
@@ -858,6 +876,12 @@ export default function ContainerLoadouts() {
     useEffect(() => {
       if (!assigningToItem) {
         setAvailableLots([]);
+        setSelectedLocationId('');
+        setSelectedBinId('');
+        setAssignStep('warehouse');
+        setWarehouseSearch('');
+        setBinSearch('');
+        setLotSearch('');
         return;
       }
 
@@ -872,14 +896,19 @@ export default function ContainerLoadouts() {
           const lots = Array.isArray(data)
             ? data
                 .filter(item => Number(item.quantity_available) > 0)
-                .filter(item =>
-                  loadoutLocationId ? Number(item.location_id) === Number(loadoutLocationId) : true
-                )
                 .map(item => ({
                   lot_id: item.lot_id,
                   lot_number: item.lot_number,
                   quantity_available: item.quantity_available,
-                  expiration_date: item.expiration_date
+                  expiration_date: item.expiration_date,
+                  location_id: item.location_id,
+                  location_name: item.location_name,
+                  bin_id: item.bin_id,
+                  aisle: item.aisle,
+                  rack: item.rack,
+                  shelf: item.shelf,
+                  bin: item.bin,
+                  zone: item.zone
                 }))
             : [];
           setAvailableLots(lots);
@@ -889,7 +918,7 @@ export default function ContainerLoadouts() {
       };
 
       fetchAvailableLots();
-    }, [assigningToItem, loadoutLocationId]);
+    }, [assigningToItem]);
 
     const assignLot = async () => {
       if (!selectedLot.lot_id || !assigningToItem) return;
@@ -1038,78 +1067,289 @@ export default function ContainerLoadouts() {
                         </td>
                       </tr>
                       
-                      {isAssigning && (
+                      {isAssigning && (() => {
+                        // Derive unique warehouse locations from available lots
+                        const warehouseMap = new Map();
+                        availableLots.forEach(lot => {
+                          if (lot.location_id) {
+                            if (!warehouseMap.has(lot.location_id)) {
+                              warehouseMap.set(lot.location_id, { name: lot.location_name || `Location #${lot.location_id}`, count: 0, totalQty: 0 });
+                            }
+                            const entry = warehouseMap.get(lot.location_id);
+                            entry.count += 1;
+                            entry.totalQty += Number(lot.quantity_available) || 0;
+                          }
+                        });
+                        const warehouses = Array.from(warehouseMap, ([id, data]) => ({ location_id: id, ...data }));
+                        const filteredWarehouses = warehouseSearch
+                          ? warehouses.filter(w => w.name.toLowerCase().includes(warehouseSearch.toLowerCase()))
+                          : warehouses;
+
+                        // Filter lots by selected warehouse
+                        const lotsAtWarehouse = selectedLocationId
+                          ? availableLots.filter(l => Number(l.location_id) === Number(selectedLocationId))
+                          : [];
+
+                        // Derive unique bins from lots at the selected warehouse
+                        const binMap = new Map();
+                        lotsAtWarehouse.forEach(lot => {
+                          if (lot.bin_id) {
+                            if (!binMap.has(lot.bin_id)) {
+                              const label = [lot.aisle, lot.rack, lot.shelf, lot.bin].filter(Boolean).join('-') || `Bin #${lot.bin_id}`;
+                              binMap.set(lot.bin_id, { label, zone: lot.zone, count: 0, totalQty: 0 });
+                            }
+                            const entry = binMap.get(lot.bin_id);
+                            entry.count += 1;
+                            entry.totalQty += Number(lot.quantity_available) || 0;
+                          }
+                        });
+                        const bins = Array.from(binMap, ([id, data]) => ({ bin_id: id, ...data }));
+                        const filteredBins = binSearch
+                          ? bins.filter(b => b.label.toLowerCase().includes(binSearch.toLowerCase()) || (b.zone && b.zone.toLowerCase().includes(binSearch.toLowerCase())))
+                          : bins;
+
+                        // Filter lots by selected bin (or show all at warehouse if no bin selected)
+                        const lotsForStep = selectedBinId
+                          ? lotsAtWarehouse.filter(l => Number(l.bin_id) === Number(selectedBinId))
+                          : lotsAtWarehouse;
+                        const filteredLots = lotSearch
+                          ? lotsForStep.filter(l => (l.lot_number || '').toLowerCase().includes(lotSearch.toLowerCase()))
+                          : lotsForStep;
+
+                        const selectedWarehouseName = selectedLocationId ? (warehouseMap.get(Number(selectedLocationId))?.name || '') : '';
+                        const selectedBinLabel = selectedBinId ? (binMap.get(Number(selectedBinId))?.label || '') : 'All Bins';
+
+                        const cancelAll = () => {
+                          setAssigningToItem(null);
+                          setSelectedLot({ lot_id: '', quantity_used: 1 });
+                          setSelectedLocationId('');
+                          setSelectedBinId('');
+                          setAssignStep('warehouse');
+                          setWarehouseSearch('');
+                          setBinSearch('');
+                          setLotSearch('');
+                        };
+
+                        return (
                         <tr className="lot-assignment-row">
                           <td colSpan={4}>
-                            <div className="lot-assignment-form">
-                              <div className="lot-assignment-field">
-                                <label>Select Lot</label>
-                                <select 
-                                  value={selectedLot.lot_id} 
-                                  onChange={(e) => {
-                                    const lotId = e.target.value;
-                                    const selectedLotData = availableLots.find(l => l.lot_id === Number(lotId));
-                                    const maxLotQty = selectedLotData ? selectedLotData.quantity_available : 1;
-                                    const maxQty = Math.min(maxLotQty, remainingQty || 1);
-                                    setSelectedLot({ 
-                                      lot_id: lotId, 
-                                      quantity_used: Math.max(1, Math.min(selectedLot.quantity_used, maxQty)) 
-                                    });
-                                  }}
-                                >
-                                  <option value="">Select lot...</option>
-                                  {availableLots.map(lot => (
-                                    <option key={lot.lot_id} value={lot.lot_id}>
-                                      {lot.lot_number} (Available: {lot.quantity_available})
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <div className="lot-assignment-field">
-                                <label>Quantity</label>
-                                <input 
-                                  type="number" 
-                                  min="1"
-                                  max={(() => {
-                                    const availableQty = availableLots.find(l => l.lot_id === Number(selectedLot.lot_id))?.quantity_available || 1;
-                                    return Math.max(1, Math.min(availableQty, remainingQty || 1));
-                                  })()}
-                                  value={selectedLot.quantity_used}
-                                  onChange={(e) => {
-                                    const availableQty = availableLots.find(l => l.lot_id === Number(selectedLot.lot_id))?.quantity_available || 1;
-                                    const maxQty = Math.max(1, Math.min(availableQty, remainingQty || 1));
-                                    const newQty = Math.max(1, Math.min(Number(e.target.value) || 1, maxQty));
-                                    setSelectedLot(prev => ({ ...prev, quantity_used: newQty }));
-                                  }}
-                                />
-                                {selectedLot.lot_id && (
-                                  <div className="text-muted">
-                                    Max available: {availableLots.find(l => l.lot_id === Number(selectedLot.lot_id))?.quantity_available || 0}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="lot-assignment-actions">
-                                <button 
+                            <div className="lot-pick-container">
+                              {/* Breadcrumb */}
+                              <div className="lot-pick-breadcrumb">
+                                <button
+                                  type="button"
+                                  className={`lot-pick-crumb ${assignStep === 'warehouse' ? 'active' : 'clickable'}`}
                                   onClick={() => {
-                                    setAssigningToItem(null);
-                                    setSelectedLot({ lot_id: '', quantity_used: 1 });
+                                    setAssignStep('warehouse');
+                                    setSelectedLocationId('');
+                                    setSelectedBinId('');
+                                    setSelectedLot({ lot_id: '', quantity_used: selectedLot.quantity_used });
+                                    setBinSearch('');
+                                    setLotSearch('');
                                   }}
-                                  className="loadout-btn ghost"
                                 >
+                                  Warehouse
+                                </button>
+                                {(assignStep === 'bin' || assignStep === 'lot') && (
+                                  <>
+                                    <span className="lot-pick-sep">/</span>
+                                    <button
+                                      type="button"
+                                      className={`lot-pick-crumb ${assignStep === 'bin' ? 'active' : 'clickable'}`}
+                                      onClick={() => {
+                                        setAssignStep('bin');
+                                        setSelectedBinId('');
+                                        setSelectedLot({ lot_id: '', quantity_used: selectedLot.quantity_used });
+                                        setLotSearch('');
+                                      }}
+                                    >
+                                      {selectedWarehouseName}
+                                    </button>
+                                  </>
+                                )}
+                                {assignStep === 'lot' && (
+                                  <>
+                                    <span className="lot-pick-sep">/</span>
+                                    <span className="lot-pick-crumb active">{selectedBinLabel}</span>
+                                  </>
+                                )}
+                                <button type="button" className="loadout-btn ghost lot-pick-cancel" onClick={cancelAll}>
                                   Cancel
                                 </button>
-                                <button 
-                                  onClick={assignLot}
-                                  disabled={!selectedLot.lot_id}
-                                  className={`loadout-btn primary ${!selectedLot.lot_id ? 'disabled' : ''}`}
-                                >
-                                  Assign
-                                </button>
                               </div>
+
+                              {/* Step 1: Warehouse */}
+                              {assignStep === 'warehouse' && (
+                                <div className="lot-pick-step">
+                                  <div className="lot-pick-search">
+                                    <Search size={14} />
+                                    <input
+                                      placeholder="Search warehouses..."
+                                      value={warehouseSearch}
+                                      onChange={(e) => setWarehouseSearch(e.target.value)}
+                                      autoFocus
+                                    />
+                                  </div>
+                                  {filteredWarehouses.length === 0 ? (
+                                    <div className="lot-pick-empty">No warehouses with available inventory</div>
+                                  ) : (
+                                    <div className="lot-pick-grid">
+                                      {filteredWarehouses.map(w => (
+                                        <button
+                                          key={w.location_id}
+                                          type="button"
+                                          className="lot-pick-card"
+                                          onClick={() => {
+                                            setSelectedLocationId(w.location_id);
+                                            setAssignStep('bin');
+                                            setWarehouseSearch('');
+                                          }}
+                                        >
+                                          <strong>{w.name}</strong>
+                                          <span>{w.count} lot{w.count !== 1 ? 's' : ''} &middot; {w.totalQty} available</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Step 2: Bin */}
+                              {assignStep === 'bin' && (
+                                <div className="lot-pick-step">
+                                  <div className="lot-pick-search">
+                                    <Search size={14} />
+                                    <input
+                                      placeholder="Search bins..."
+                                      value={binSearch}
+                                      onChange={(e) => setBinSearch(e.target.value)}
+                                      autoFocus
+                                    />
+                                  </div>
+                                  <div className="lot-pick-grid">
+                                    {/* All Bins option */}
+                                    <button
+                                      type="button"
+                                      className="lot-pick-card lot-pick-card-all"
+                                      onClick={() => {
+                                        setSelectedBinId('');
+                                        setAssignStep('lot');
+                                        setBinSearch('');
+                                      }}
+                                    >
+                                      <strong>All Bins</strong>
+                                      <span>{lotsAtWarehouse.length} lot{lotsAtWarehouse.length !== 1 ? 's' : ''} total</span>
+                                    </button>
+                                    {filteredBins.map(b => (
+                                      <button
+                                        key={b.bin_id}
+                                        type="button"
+                                        className="lot-pick-card"
+                                        onClick={() => {
+                                          setSelectedBinId(b.bin_id);
+                                          setAssignStep('lot');
+                                          setBinSearch('');
+                                        }}
+                                      >
+                                        <strong>{b.label}</strong>
+                                        {b.zone && <span className="lot-pick-zone">Zone {b.zone}</span>}
+                                        <span>{b.count} lot{b.count !== 1 ? 's' : ''} &middot; {b.totalQty} available</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {bins.length === 0 && (
+                                    <div className="lot-pick-empty">No bins at this warehouse — showing all lots</div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Step 3: Lot + Quantity */}
+                              {assignStep === 'lot' && (
+                                <div className="lot-pick-step">
+                                  <div className="lot-pick-search">
+                                    <Search size={14} />
+                                    <input
+                                      placeholder="Search lots..."
+                                      value={lotSearch}
+                                      onChange={(e) => setLotSearch(e.target.value)}
+                                      autoFocus
+                                    />
+                                  </div>
+                                  {filteredLots.length === 0 ? (
+                                    <div className="lot-pick-empty">No lots available</div>
+                                  ) : (
+                                    <div className="lot-pick-grid">
+                                      {filteredLots.map(lot => {
+                                        const isSelected = Number(selectedLot.lot_id) === lot.lot_id;
+                                        return (
+                                          <button
+                                            key={lot.lot_id}
+                                            type="button"
+                                            className={`lot-pick-card ${isSelected ? 'selected' : ''}`}
+                                            onClick={() => {
+                                              const maxQty = Math.min(lot.quantity_available, remainingQty || 1);
+                                              setSelectedLot({
+                                                lot_id: lot.lot_id,
+                                                quantity_used: Math.max(1, Math.min(selectedLot.quantity_used, maxQty))
+                                              });
+                                            }}
+                                          >
+                                            <strong>{lot.lot_number || `Lot #${lot.lot_id}`}</strong>
+                                            <span>{lot.quantity_available} available</span>
+                                            {lot.expiration_date && (
+                                              <span className="lot-pick-exp">
+                                                Exp: {new Date(lot.expiration_date).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+
+                                  {/* Quantity + Assign bar */}
+                                  {selectedLot.lot_id && (
+                                    <div className="lot-pick-assign-bar">
+                                      <div className="lot-pick-assign-info">
+                                        <strong>{filteredLots.find(l => l.lot_id === Number(selectedLot.lot_id))?.lot_number}</strong>
+                                        <span className="text-muted">
+                                          Max: {filteredLots.find(l => l.lot_id === Number(selectedLot.lot_id))?.quantity_available || 0}
+                                        </span>
+                                      </div>
+                                      <div className="lot-pick-assign-qty">
+                                        <label>Qty</label>
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          max={(() => {
+                                            const availableQty = filteredLots.find(l => l.lot_id === Number(selectedLot.lot_id))?.quantity_available || 1;
+                                            return Math.max(1, Math.min(availableQty, remainingQty || 1));
+                                          })()}
+                                          value={selectedLot.quantity_used}
+                                          onChange={(e) => {
+                                            const availableQty = filteredLots.find(l => l.lot_id === Number(selectedLot.lot_id))?.quantity_available || 1;
+                                            const maxQty = Math.max(1, Math.min(availableQty, remainingQty || 1));
+                                            const newQty = Math.max(1, Math.min(Number(e.target.value) || 1, maxQty));
+                                            setSelectedLot(prev => ({ ...prev, quantity_used: newQty }));
+                                          }}
+                                        />
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={assignLot}
+                                        className="loadout-btn primary"
+                                      >
+                                        Assign
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
-                      )}
+                        );
+                      })()}
                     </React.Fragment>
                   );
                 })}
@@ -1153,14 +1393,14 @@ export default function ContainerLoadouts() {
                 className={`list-item loadout-list-item ${selectedId === l.loadout_id ? 'selected' : ''}`}
                 onClick={() => { setSelectedId(l.loadout_id); setIsEditing(false); setActiveTab('general'); }}
               >
-                <h3>{l.blueprint_name || 'Untitled Loadout'}</h3>
-                <p>
-                  {l.location_name && <span>{l.location_name}</span>}
-                  {l.location_name && l.full_serial && <span> • </span>}
-                  {l.full_serial && <span>{l.full_serial}</span>}
-                  {(l.location_name || l.full_serial) && <span> • </span>}
-                  <span>{new Date(l.created_at).toLocaleString()}</span>
-                </p>
+                <div className="list-item-title">{l.blueprint_name || 'Untitled Loadout'}</div>
+                <div className="list-item-meta">
+                  {l.location_name && <span className="list-chip">{l.location_name}</span>}
+                  {l.full_serial && <span className="list-chip">{l.full_serial}</span>}
+                  <span className="list-chip subtle">
+                    {l.created_at ? new Date(l.created_at).toLocaleDateString() : 'No Date'}
+                  </span>
+                </div>
               </div>
             ))
           )}
@@ -1236,7 +1476,6 @@ export default function ContainerLoadouts() {
               <LoadoutItems
                 loadoutId={selected.loadout_id}
                 blueprintId={selected.blueprint_id}
-                loadoutLocationId={selected.location_id}
               />
             )}
           </>

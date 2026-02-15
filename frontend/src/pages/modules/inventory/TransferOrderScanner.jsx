@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Package,
   Keyboard,
@@ -1044,14 +1045,15 @@ const TransferOrderScanner = ({ order, onClose, onUpdate }) => {
     );
   };
 
-  return (
+  return createPortal(
     <div className="scanner-overlay">
       <div className="scanner-container">
         {isPickingMode && renderPickingInterface()}
         {isPackingMode && renderPackingInterface()}
         {isShippingMode && renderShippingInterface()}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

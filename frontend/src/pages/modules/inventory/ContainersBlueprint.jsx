@@ -679,11 +679,17 @@ This item might be in use by existing containers. Please check and try again.`);
               className={`list-item blueprint-list-item ${selectedId === b.blueprint_id ? 'selected' : ''}`}
               onClick={() => { setSelectedId(b.blueprint_id); setIsEditing(false); setActiveTab('general'); }}
             >
-              <h3>{b.blueprint_name}</h3>
-              <p>{[b.serial_number_prefix, b.is_active ? 'Active' : 'Inactive'].filter(Boolean).join(' • ')}</p>
+              <div className="list-item-title">{b.blueprint_name}</div>
+              <div className="list-item-meta">
+                <span className="list-chip">{b.serial_number_prefix || 'No Prefix'}</span>
+                <span className={`list-chip status ${b.is_active ? 'active' : 'inactive'}`}>
+                  {b.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
             </div>
           ))}
           {loading && <div className="loading-row">Loading…</div>}
+          {!loading && blueprints.length === 0 && <div className="no-data">No blueprints found</div>}
         </div>
 
         <div className="list-panel-footer">

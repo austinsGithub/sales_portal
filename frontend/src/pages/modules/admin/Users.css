@@ -2,8 +2,8 @@
 .users-layout {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 80px);
-  background: linear-gradient(180deg, #f6f7fb 0%, #eef1f7 100%);
+  min-height: 0;
+  background: #f8fafc;
 }
 
 /* Header */
@@ -11,15 +11,15 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 1.25rem 1.5rem;
+  padding: 1rem 1.25rem;
   background: white;
   border-bottom: 1px solid #e5e7eb;
-  box-shadow: 0 8px 20px rgba(12, 18, 38, 0.06);
+  box-shadow: none;
 }
 
 .users-header h1 {
   margin: 0 0 0.25rem 0;
-  font-size: 1.875rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #111827;
 }
@@ -40,10 +40,10 @@
   min-width: 300px;
   background: #ffffff;
   color: #111827;
-  border-radius: 0.75rem;
+  border-radius: 0.6rem;
   padding: 0.1rem;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+  box-shadow: none;
 }
 
 .role-filter {
@@ -69,33 +69,29 @@
 
 /* Content Layout - Table View */
 .users-table-container {
-  padding: 1rem 1.25rem 1.25rem;
+  padding: 1rem 1.25rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  background: linear-gradient(180deg, #edf1f7 0%, #e3e8f1 100%);
-  border: 1px solid #dfe6f1;
-  border-radius: 0.85rem;
-  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.08);
-  min-height: 70vh;
+  flex: 0 1 auto;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  min-height: 0;
 }
 
 .users-table-wrapper {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
+  display: block;
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 0.65rem;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
-  flex: 1 1 auto;
+  border-radius: 0.75rem;
+  box-shadow: none;
+  overflow: hidden;
 }
 
 .users-table-scroll {
-  flex: 1 1 auto;
   overflow: auto;
-  min-height: 0;
+  min-height: 220px;
+  max-height: 560px;
 }
 
 .users-table-scroll::-webkit-scrollbar {
@@ -132,16 +128,19 @@
 .users-table thead {
   position: sticky;
   top: 0;
-  background: #f1f5fb;
+  background: #f8fafc;
   z-index: 1;
 }
 
 .users-table th {
-  padding: 0.75rem 1rem;
+  padding: 0.78rem 1rem;
   text-align: left;
   font-weight: 600;
-  color: #0f172a;
-  border-bottom: 2px solid #e5e7eb;
+  color: #475569;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
   background: #f8fafc;
   width: auto; /* Reset fixed widths */
@@ -153,7 +152,7 @@
 }
 
 .users-table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid #eef2f7;
   transition: background-color 0.15s;
 }
 
@@ -162,7 +161,7 @@
 }
 
 .users-table td {
-  padding: 0.75rem 1rem;
+  padding: 0.78rem 1rem;
   color: #111827;
   vertical-align: middle;
 }
@@ -188,8 +187,28 @@
 }
 
 .username-text {
-  font-weight: 500;
+  font-weight: 600;
   color: #111827;
+}
+
+.email-cell {
+  font-size: 0.82rem;
+  color: #1f2937;
+}
+
+.company-cell {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.role-chip {
+  display: inline-block;
+  padding: 0.2rem 0.58rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #334155;
 }
 
 .actions-column {
@@ -229,11 +248,11 @@
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  padding: 0.85rem 0.75rem 0.75rem;
+  padding: 0.75rem 0.85rem;
   color: #334155;
-  font-size: 0.9rem;
-  background: transparent;
-  margin-top: auto;
+  font-size: 0.82rem;
+  background: #ffffff;
+  border-top: 1px solid #eef2f7;
 }
 
 .page-info {
@@ -605,7 +624,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1rem;
-  background: linear-gradient(135deg, #0f0f0f 0%, #1f1f1f 100%);
+  background: #2563eb;
   color: white;
   border: none;
   border-radius: 0.5rem;
@@ -613,11 +632,11 @@
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.15s;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
+  box-shadow: none;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #000000 0%, #0f0f0f 100%);
+  background: #1d4ed8;
 }
 
 .btn-primary:disabled {
@@ -741,14 +760,20 @@
 }
 
 /* Modal */
+body.admin-modal-open #root {
+  filter: blur(6px);
+  transition: filter 0.2s ease;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 17, 26, 0.55);
-  backdrop-filter: blur(2px);
+  background: rgba(15, 23, 42, 0.48);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;

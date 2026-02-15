@@ -33,7 +33,7 @@
   width: min(1300px, 100%);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
   gap: clamp(1.25rem, 2vw, 2.3rem);
   align-items: stretch;
 }
@@ -48,25 +48,46 @@
 }
 
 .blueprint-list-item {
-  border-radius: 16px;
-  padding: 0.95rem 1.1rem;
-  background: rgba(255, 255, 255, 0.92);
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.4rem;
 }
 
-.blueprint-list-item h3 {
+.blueprints-layout .list-item-title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   color: var(--workspace-ink);
+  line-height: 1.3;
 }
 
-.blueprint-list-item p {
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--workspace-muted);
+.blueprints-layout .list-item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.blueprints-layout .list-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.blueprints-layout .list-chip.status.active {
+  background: #e8f7ef;
+  color: #0f766e;
+}
+
+.blueprints-layout .list-chip.status.inactive {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .add-blueprint-btn {
@@ -287,47 +308,57 @@
 }
 
 .blueprint-table-card {
-  border-radius: 22px;
-  border: 1px solid rgba(17, 17, 23, 0.08);
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 25px 60px rgba(15, 17, 23, 0.12);
+  background: #ffffff;
+  box-shadow: none;
 }
 
 .blueprint-items-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 0.92rem;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  background: #ffffff;
 }
 
 .blueprint-items-table .product-col { width: 30%; min-width: 220px; }
 .blueprint-items-table .qty-col { width: 10%; text-align: center; }
 .blueprint-items-table .notes-col { width: 30%; }
-.blueprint-items-table .actions-col { width: 80px; text-align: center; }
+.blueprint-items-table .actions-col { width: 96px; text-align: center; }
 
 .blueprint-items-table thead th {
   text-align: left;
-  background: rgba(17, 17, 23, 0.03);
+  background: #f8fafc;
   padding: 0.85rem 1rem;
   font-weight: 600;
-  color: var(--workspace-muted);
-  border-bottom: 1px solid rgba(17, 17, 23, 0.08);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .blueprint-items-table td {
-  padding: 0.9rem 1rem;
-  border-bottom: 1px solid rgba(17, 17, 23, 0.06);
+  padding: 1rem;
+  border-bottom: 1px solid #eef2f7;
   vertical-align: middle;
+  background: #ffffff;
+}
+
+.blueprint-items-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .blueprint-items-table .qty-cell {
   text-align: center;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #1e293b;
 }
 
 .blueprint-items-table .notes-cell {
-  color: var(--workspace-muted);
+  color: #64748b;
 }
 
 .blueprint-items-table .actions-cell {
@@ -335,44 +366,56 @@
 }
 
 .blueprint-items-table tr:hover {
-  background: rgba(17, 17, 23, 0.02);
+  background: #f8fafc;
+}
+
+.blueprint-items-table tr:hover td {
+  background: #f8fafc;
 }
 
 .product-name {
   font-weight: 600;
-  color: var(--workspace-ink);
+  color: #0f172a;
 }
 
 .product-sku {
-  font-size: 0.8rem;
-  color: var(--workspace-muted);
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
+  color: #64748b;
 }
 
 .qty-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem 0.75rem;
+  min-width: 2rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: rgba(15, 118, 255, 0.12);
-  color: rgb(15, 118, 255);
+  background: #dbeafe;
+  color: #2563eb;
   font-weight: 600;
-  min-width: 48px;
+  font-size: 0.82rem;
 }
 
 .remove-btn {
-  border: none;
-  background: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
+  border: 1px solid #fecaca;
+  background: #fff5f5;
+  color: #dc2626;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .remove-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
+  background: #fee2e2;
+  border-color: #fca5a5;
 }
 
 .error-banner {
@@ -387,6 +430,13 @@
 .loading-row {
   padding: 1rem;
   text-align: center;
+  color: var(--workspace-muted);
+  font-weight: 600;
+}
+
+.no-data {
+  text-align: center;
+  padding: 2rem 1rem;
   color: var(--workspace-muted);
   font-weight: 600;
 }

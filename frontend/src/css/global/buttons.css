@@ -1,0 +1,126 @@
+/* ==========================================================================
+   Shared Button Styles
+   Canonical definitions for buttons used across all modules.
+   ========================================================================== */
+
+/* Base action button */
+.action-btn {
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--ease-spring);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+}
+
+/* Primary button — dark ink background */
+.primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: 10px;
+  padding: 0.55rem 1.25rem;
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  border: none;
+  transition: transform var(--ease-default), box-shadow var(--ease-default);
+  background: var(--color-ink);
+  color: var(--color-white);
+  box-shadow: none;
+}
+
+.primary-btn:hover {
+  background: var(--color-ink-hover);
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Secondary button — light background with border */
+.secondary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-radius: 10px;
+  padding: 0.55rem 1.25rem;
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: transform var(--ease-default), box-shadow var(--ease-default);
+  background: var(--color-gray-50);
+  color: var(--color-ink-strong);
+  border: 1px solid var(--color-gray-200);
+}
+
+.secondary-btn:hover {
+  background: var(--color-gray-100);
+  border-color: var(--color-gray-300);
+}
+
+.secondary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Ghost button — transparent background */
+.ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.55rem 1.25rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--color-gray-500);
+  transition: background var(--ease-default), color var(--ease-default);
+}
+
+.ghost-btn:hover {
+  background: var(--color-gray-200);
+  color: var(--color-gray-700);
+}
+
+/* Icon-only button */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-gray-200);
+  background: var(--color-white);
+  color: var(--color-gray-700);
+  cursor: pointer;
+  transition: all var(--ease-default);
+}
+
+.icon-btn:hover {
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-300);
+}
+
+/* Link-styled button */
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--color-blue-600);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
+}

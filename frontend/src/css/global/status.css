@@ -1,0 +1,108 @@
+/* ==========================================================================
+   Shared Status Indicators
+   Canonical definitions for status pills, badges, and priority indicators.
+   ========================================================================== */
+
+/* --- Status Pills --- */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.status-pill-pending {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.status-pill-approved {
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
+}
+
+.status-pill-picked {
+  background: var(--color-cyan-bg);
+  color: var(--color-cyan-text);
+}
+
+.status-pill-packed {
+  background: var(--color-purple-bg);
+  color: var(--color-purple-text);
+}
+
+.status-pill-shipped {
+  background: var(--color-violet-bg);
+  color: var(--color-violet-text);
+}
+
+.status-pill-received {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.status-pill-completed {
+  background: var(--color-slate-200);
+  color: var(--color-slate-600);
+}
+
+.status-pill-cancelled {
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+}
+
+/* --- Priority Indicators --- */
+.priority-pill {
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-pill);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.priority-high {
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+}
+
+.priority-medium {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.priority-low {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+/* --- Status Badges (compact) --- */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-badge-active,
+.status-badge-success {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.status-badge-inactive,
+.status-badge-warning {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.status-badge-error {
+  background: var(--color-error-bg);
+  color: var(--color-error-text);
+}

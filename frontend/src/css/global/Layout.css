@@ -1,28 +1,22 @@
 :root {
-  --workspace-canvas: #fefefe;
-  --workspace-pane: #ffffff;
-  --workspace-pane-strong: #ffffff;
+  /* Legacy aliases — point to tokens.css values */
+  --workspace-canvas: var(--bg-canvas);
+  --workspace-pane: var(--bg-surface);
+  --workspace-pane-strong: var(--bg-surface);
   --workspace-border: rgba(15, 19, 43, 0.06);
   --workspace-border-strong: rgba(15, 19, 43, 0.12);
   --workspace-shadow-soft: none;
   --workspace-shadow-card: none;
-  --workspace-ink: #111322;
+  --workspace-ink: var(--color-ink);
   --workspace-muted: #6d7384;
   --workspace-radius-lg: 24px;
-  --workspace-radius-md: 16px;
-  --content-max-width: 1440px;
-  --content-gutter: clamp(16px, 2vw, 28px);
-  --content-gutter-vertical: clamp(18px, 2vw, 32px);
-  --content-gutter-bottom: clamp(24px, 3vw, 48px);
+  --workspace-radius-md: var(--radius-xl);
   --chrome-divider: rgba(15, 19, 43, 0.08);
   --chrome-divider-strong: rgba(15, 19, 43, 0.12);
-  --topbar-height: 72px;
-  --topbar-offset: 0px;
-  --type-base: clamp(14px, 0.95vw, 16px);
 }
 
 body {
-  font-family: "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-family);
   background: var(--workspace-canvas);
   color: var(--workspace-ink);
   font-size: var(--type-base);
@@ -104,7 +98,7 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: var(--content-gutter-vertical) var(--content-gutter) var(--content-gutter-bottom);
-  background: #ffffff;
+  background: var(--bg-surface);
   max-width: var(--content-max-width);
   margin: 0 auto;
   width: 100%;
@@ -114,8 +108,8 @@ body {
 .app-footer {
   flex-shrink: 0;
   padding: 1rem 2.25rem 1.5rem;
-  border-top: 1px solid rgba(15, 19, 43, 0.06);
-  background: #ffffff;
+  border-top: 1px solid var(--workspace-border);
+  background: var(--bg-surface);
   display: flex;
   flex-wrap: wrap;
   gap: 0.65rem;
@@ -139,7 +133,7 @@ body {
 }
 
 .footer-divider {
-  color: #d1d5db;
+  color: var(--color-gray-300);
 }
 
 @media (max-width: 768px) {

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   ChevronDown,
   ChevronRight,
@@ -26,6 +27,21 @@ function RolesPermissions() {
     description: "",
   });
   const [formErrors, setFormErrors] = useState({});
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    if (isCreateModalOpen) {
+      document.body.classList.add("admin-modal-open");
+    } else {
+      document.body.classList.remove("admin-modal-open");
+    }
+    return () => document.body.classList.remove("admin-modal-open");
+  }, [isCreateModalOpen]);
+
+  const renderModal = (node) => {
+    if (typeof document === "undefined") return null;
+    return createPortal(node, document.body);
+  };
 
   // Custom checkbox component that supports indeterminate state
   const IndeterminateCheckbox = ({ checked, indeterminate, ...rest }) => {
@@ -588,18 +604,20 @@ function RolesPermissions() {
         </div>
       </div>
       {/* Create Role Modal */}
-      {isCreateModalOpen && (
+      {isCreateModalOpen && renderModal(
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          backgroundColor: 'rgba(15, 23, 42, 0.48)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
+          zIndex: 9999,
         }}>
           <div style={{
             backgroundColor: 'white',

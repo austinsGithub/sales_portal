@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, UserPlus, Edit, X, Save, User, Loader, MoreVertical, Key } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../../../shared/contexts/AuthContext';
 import './Users.css';
 
@@ -75,6 +76,7 @@ function Users() {
   const [resetConfirmPassword, setResetConfirmPassword] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetting, setResetting] = useState(false);
+  const modalOpen = Boolean(creatingUser || editingUser || (showPasswordReset && selectedUser));
 
   const handleUnauthorized = useCallback((message = 'Session expired. Please log in again.') => {
     Promise.resolve(logout())
@@ -132,6 +134,16 @@ function Users() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    if (modalOpen) {
+      document.body.classList.add('admin-modal-open');
+    } else {
+      document.body.classList.remove('admin-modal-open');
+    }
+    return () => document.body.classList.remove('admin-modal-open');
+  }, [modalOpen]);
 
   // Filter users
   const filteredUsers = useMemo(() => {
@@ -451,6 +463,11 @@ function Users() {
     return typeof user.role === 'string' ? user.role : (user.is_super_admin ? 'Super Admin' : 'User');
   };
 
+  const renderModal = (node) => {
+    if (typeof document === 'undefined') return null;
+    return createPortal(node, document.body);
+  };
+
   return (
     <div className="users-layout">
       {/* Header */}
@@ -522,20 +539,10 @@ function Users() {
                         </div>
                       </td>
                       <td>{user.first_name || user.last_name ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : '-'}</td>
-                      <td style={{ fontSize: '0.8125rem' }}>{user.email || '-'}</td>
-                      <td style={{ fontSize: '0.8125rem', color: '#9ca3af' }}>{user.company_name || '-'}</td>
+                      <td className="email-cell">{user.email || '-'}</td>
+                      <td className="company-cell">{user.company_name || '-'}</td>
                       <td>
-                        <span style={{
-                          display: 'inline-block',
-                          padding: '0.25rem 0.625rem',
-                          borderRadius: '0.375rem',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          backgroundColor: '#f3f4f6',
-                          color: '#0f172a'
-                        }}>
-                          {getUserRole(user)}
-                        </span>
+                        <span className="role-chip">{getUserRole(user)}</span>
                       </td>
                       <td><StatusBadge status={user.status || (user.is_active ? 'active' : 'inactive')} /></td>
                       <td className="actions-column">
@@ -605,7 +612,7 @@ function Users() {
       </div>
 
       {/* Edit/Create Modal */}
-      {(creatingUser || editingUser) && (
+      {(creatingUser || editingUser) && renderModal(
         <div className="modal-overlay" onClick={handleCancelEdit}>
           <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
             <form onSubmit={handleSubmit}>
@@ -797,7 +804,7 @@ function Users() {
       )}
 
       {/* Password Reset Modal */}
-      {showPasswordReset && selectedUser && (
+      {showPasswordReset && selectedUser && renderModal(
         <div className="modal-overlay" onClick={handleCancelPasswordReset}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">

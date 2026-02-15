@@ -1,8 +1,9 @@
 :root {
-  --login-body: #ffffff;
+  /* Legacy aliases — point to tokens.css values */
+  --login-body: var(--bg-surface);
   --login-ink: #1a1a1a;
-  --login-muted: #6b7280;
-  --login-border: #e5e7eb;
+  --login-muted: var(--color-gray-500);
+  --login-border: var(--border-default);
   --login-accent: #000000;
 }
 
@@ -127,39 +128,6 @@
   color: var(--login-muted);
   margin: 0 0 2rem 0;
   line-height: 1.6;
-}
-
-/* Social Login Buttons */
-.social-login-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin-bottom: 2rem;
-}
-
-.social-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--login-border);
-  border-radius: 8px;
-  background: #ffffff;
-  color: var(--login-ink);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.social-btn:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
-}
-
-.social-btn svg {
-  flex-shrink: 0;
 }
 
 /* Form Styles */
@@ -402,10 +370,6 @@
 
   .login-title {
     font-size: 1.75rem;
-  }
-
-  .social-login-buttons {
-    grid-template-columns: 1fr;
   }
 
   .form-options {

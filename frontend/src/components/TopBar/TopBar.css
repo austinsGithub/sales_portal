@@ -1,9 +1,8 @@
 :root {
+  /* Legacy aliases — point to tokens.css values */
   --color-text-base: #111111;
   --color-text-secondary: #5c5c5c;
   --color-border: #dcdcdc;
-  --topbar-height: 72px;
-  --topbar-offset: 0px;
 }
 
 @media (max-width: 600px) {

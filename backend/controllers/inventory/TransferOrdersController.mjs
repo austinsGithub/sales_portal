@@ -25,6 +25,65 @@ const parseDateOrNull = (value) => {
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
+const TERMINAL_OR_IN_PROGRESS_STATUSES = new Set(['Picked', 'Packed', 'Shipped', 'Received', 'Completed']);
+const EDITABLE_ORDER_STATUSES = new Set(['Pending', 'Approved']);
+
+async function releaseReservation({
+  connection,
+  company_id,
+  inventory_id,
+  quantity
+}) {
+  const qty = Number(quantity) || 0;
+  if (!inventory_id || qty <= 0) return;
+
+  await exec(
+    connection,
+    `UPDATE inventory
+     SET quantity_available = quantity_available + LEAST(COALESCE(quantity_reserved, 0), ?),
+         quantity_reserved  = GREATEST(COALESCE(quantity_reserved, 0) - ?, 0)
+     WHERE inventory_id = ? AND company_id = ?`,
+    [qty, qty, inventory_id, company_id]
+  );
+}
+
+async function releaseUnpickedReservationsForOrder({
+  connection,
+  company_id,
+  transfer_order_id
+}) {
+  const [items] = await exec(
+    connection,
+    `SELECT
+      transfer_order_item_id,
+      inventory_id,
+      picked_inventory_id,
+      quantity,
+      quantity_picked
+     FROM transfer_order_items
+     WHERE transfer_order_id = ? AND company_id = ?`,
+    [transfer_order_id, company_id]
+  );
+
+  for (const item of items) {
+    const sourceInventoryId = item.picked_inventory_id || item.inventory_id;
+    const ordered = Number(item.quantity) || 0;
+    const picked = Number(item.quantity_picked) || 0;
+    const unpickedQty = Math.max(ordered - picked, 0);
+
+    if (sourceInventoryId && unpickedQty > 0) {
+      await releaseReservation({
+        connection,
+        company_id,
+        inventory_id: sourceInventoryId,
+        quantity: unpickedQty
+      });
+    }
+  }
+
+  return items;
+}
+
 /**
  * Validates that all items in a transfer order match the destination loadout blueprint
  * @param {Array} items - Transfer order items with part_id
@@ -200,19 +259,32 @@ async function assignInventoryToOrder({
   );
 
   if (order.loadout_id) {
-    await exec(
-      connection,
-      `INSERT INTO container_loadout_lots
-        (loadout_id, product_id, lot_id, quantity_used, notes)
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        order.loadout_id,
-        blueprintItem?.product_id || null,
-        inventoryRow.lot_id || null,
-        qty,
-        note || `Manual assignment for transfer order ${order.transfer_order_number}`
-      ]
-    );
+    // Resolve product_id: from blueprint item if available, otherwise look up from part_id
+    let productId = blueprintItem?.product_id || null;
+    if (!productId && part_id) {
+      const [[prod]] = await exec(
+        connection,
+        `SELECT product_id FROM products WHERE part_id = ? AND company_id = ? LIMIT 1`,
+        [part_id, company_id]
+      );
+      productId = prod?.product_id || null;
+    }
+
+    if (productId) {
+      await exec(
+        connection,
+        `INSERT INTO container_loadout_lots
+          (loadout_id, product_id, lot_id, quantity_used, notes)
+         VALUES (?, ?, ?, ?, ?)`,
+        [
+          order.loadout_id,
+          productId,
+          inventoryRow.lot_id || null,
+          qty,
+          note || `Manual assignment for transfer order ${order.transfer_order_number}`
+        ]
+      );
+    }
   }
 
   const [result] = await exec(
@@ -1057,6 +1129,13 @@ class TransferOrdersController {
           });
         }
 
+        // Release any unpicked reserved quantities so they do not remain locked indefinitely.
+        await releaseUnpickedReservationsForOrder({
+          connection,
+          company_id,
+          transfer_order_id: id
+        });
+
         await recordShipMovementsForOrder({
           connection: connection,
           transferOrderId: id,
@@ -1109,7 +1188,7 @@ class TransferOrdersController {
         );
 
         const [[order]] = await connection.query(
-          `SELECT company_id, to_location_id, destination_type, destination_loadout_id, transfer_order_number
+          `SELECT company_id, to_location_id, destination_type, destination_loadout_id, transfer_order_number, loadout_id
            FROM transfer_orders
            WHERE transfer_order_id = ? AND company_id = ?`,
           [id, company_id]
@@ -1197,21 +1276,36 @@ class TransferOrdersController {
             );
 
             if (partInfo) {
-              // Add to container_loadout_lots
-              await connection.query(
-                `INSERT INTO container_loadout_lots
-                  (loadout_id, product_id, lot_id, quantity_used, notes)
-                 VALUES (?, ?, ?, ?, ?)
-                 ON DUPLICATE KEY UPDATE
-                   quantity_used = quantity_used + VALUES(quantity_used)`,
-                [
-                  order.destination_loadout_id,
-                  partInfo.product_id,
-                  item.lot_id,
-                  item.quantity_picked,
-                  `Received from transfer order ${order.transfer_order_number}`
-                ]
+              // Upsert into container_loadout_lots using app-level logic
+              // (ON DUPLICATE KEY UPDATE does not work reliably when lot_id is NULL)
+              const [existingLots] = await connection.query(
+                `SELECT loadout_lot_id, quantity_used
+                 FROM container_loadout_lots
+                 WHERE loadout_id = ? AND product_id = ? AND (lot_id <=> ?)`,
+                [order.destination_loadout_id, partInfo.product_id, item.lot_id]
               );
+
+              if (existingLots.length > 0) {
+                await connection.query(
+                  `UPDATE container_loadout_lots
+                   SET quantity_used = quantity_used + ?
+                   WHERE loadout_lot_id = ?`,
+                  [item.quantity_picked, existingLots[0].loadout_lot_id]
+                );
+              } else {
+                await connection.query(
+                  `INSERT INTO container_loadout_lots
+                    (loadout_id, product_id, lot_id, quantity_used, notes)
+                   VALUES (?, ?, ?, ?, ?)`,
+                  [
+                    order.destination_loadout_id,
+                    partInfo.product_id,
+                    item.lot_id,
+                    item.quantity_picked,
+                    `Received from transfer order ${order.transfer_order_number}`
+                  ]
+                );
+              }
 
               // Update destination inventory to reference the loadout
               await connection.query(
@@ -1231,6 +1325,16 @@ class TransferOrdersController {
             toBinId: null,
             userId: user_id
           });
+        }
+
+        // Move source loadout to destination location after receipt.
+        if (order.loadout_id && order.to_location_id) {
+          await connection.query(
+            `UPDATE container_loadouts
+             SET location_id = ?
+             WHERE loadout_id = ? AND company_id = ?`,
+            [order.to_location_id, order.loadout_id, company_id]
+          );
         }
 
         await connection.query(
@@ -1284,13 +1388,18 @@ class TransferOrdersController {
             });
           }
 
+          const [[currentOrder]] = await connection.query(
+            `SELECT status FROM transfer_orders WHERE transfer_order_id = ? AND company_id = ?`,
+            [id, company_id]
+          );
+
+          if (!currentOrder) {
+            await connection.rollback();
+            return res.status(404).json({ error: 'Transfer order not found' });
+          }
+
           // Block "Completed" unless order was received
           if (req.body.status === 'Completed') {
-            const [[currentOrder]] = await connection.query(
-              `SELECT status FROM transfer_orders WHERE transfer_order_id = ? AND company_id = ?`,
-              [id, company_id]
-            );
-
             if (currentOrder.status !== 'Received') {
               await connection.rollback();
               return res.status(400).json({
@@ -1312,6 +1421,20 @@ class TransferOrdersController {
               break;
             case 'Completed':
               patch.completed_date = now;
+              break;
+            case 'Cancelled':
+              if (!EDITABLE_ORDER_STATUSES.has(currentOrder.status)) {
+                await connection.rollback();
+                return res.status(400).json({
+                  error: `Cannot cancel order in ${currentOrder.status} status.`
+                });
+              }
+
+              await releaseUnpickedReservationsForOrder({
+                connection,
+                company_id,
+                transfer_order_id: id
+              });
               break;
             default:
               break;
@@ -1361,6 +1484,11 @@ class TransferOrdersController {
 
       const order = await fetchOrder(company_id, id);
       if (!order) return res.status(404).json({ error: 'Transfer order not found' });
+      if (!EDITABLE_ORDER_STATUSES.has(order.status)) {
+        return res.status(400).json({
+          error: `Items can only be added when order status is Pending or Approved. Current status: ${order.status}`
+        });
+      }
 
       const {
         inventory_id,
@@ -1729,6 +1857,7 @@ class TransferOrdersController {
   }
 
   async deleteItem(req, res) {
+    const connection = await pool.getConnection();
     try {
       const company_id = req.user?.company_id;
       const id = Number(req.params.id);
@@ -1738,20 +1867,64 @@ class TransferOrdersController {
         return res.status(400).json({ error: 'Invalid identifiers' });
       }
 
-      const [result] = await pool.query(
+      await connection.beginTransaction();
+
+      const [[order]] = await connection.query(
+        `SELECT status FROM transfer_orders
+         WHERE transfer_order_id = ? AND company_id = ?`,
+        [id, company_id]
+      );
+
+      if (!order) {
+        await connection.rollback();
+        return res.status(404).json({ error: 'Transfer order not found' });
+      }
+
+      if (TERMINAL_OR_IN_PROGRESS_STATUSES.has(order.status)) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: `Cannot delete items when order status is ${order.status}.`
+        });
+      }
+
+      const [[item]] = await connection.query(
+        `SELECT transfer_order_item_id, inventory_id, picked_inventory_id, quantity, quantity_picked
+         FROM transfer_order_items
+         WHERE transfer_order_item_id = ? AND transfer_order_id = ? AND company_id = ?`,
+        [itemId, id, company_id]
+      );
+
+      if (!item) {
+        await connection.rollback();
+        return res.status(404).json({ error: 'Item not found' });
+      }
+
+      const sourceInventoryId = item.picked_inventory_id || item.inventory_id;
+      const unpickedQty = Math.max((Number(item.quantity) || 0) - (Number(item.quantity_picked) || 0), 0);
+      if (sourceInventoryId && unpickedQty > 0) {
+        await releaseReservation({
+          connection,
+          company_id,
+          inventory_id: sourceInventoryId,
+          quantity: unpickedQty
+        });
+      }
+
+      await connection.query(
         `DELETE FROM transfer_order_items
          WHERE transfer_order_item_id = ? AND transfer_order_id = ? AND company_id = ?`,
         [itemId, id, company_id]
       );
 
-      if (!result.affectedRows) {
-        return res.status(404).json({ error: 'Item not found' });
-      }
+      await connection.commit();
 
       return res.json({ success: true });
     } catch (error) {
+      await connection.rollback();
       console.error('Error deleting transfer order item:', error);
       return res.status(500).json({ error: 'Failed to delete item' });
+    } finally {
+      connection.release();
     }
   }
 
@@ -1764,6 +1937,30 @@ class TransferOrdersController {
       if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid transfer order id' });
 
       await connection.beginTransaction();
+
+      const [[order]] = await connection.query(
+        `SELECT status FROM transfer_orders
+         WHERE transfer_order_id = ? AND company_id = ?`,
+        [id, company_id]
+      );
+
+      if (!order) {
+        await connection.rollback();
+        return res.status(404).json({ error: 'Transfer order not found' });
+      }
+
+      if (TERMINAL_OR_IN_PROGRESS_STATUSES.has(order.status)) {
+        await connection.rollback();
+        return res.status(400).json({
+          error: `Cannot delete order in ${order.status} status.`
+        });
+      }
+
+      await releaseUnpickedReservationsForOrder({
+        connection,
+        company_id,
+        transfer_order_id: id
+      });
 
       await connection.query(
         `DELETE FROM transfer_order_items WHERE transfer_order_id = ? AND company_id = ?`,

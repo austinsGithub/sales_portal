@@ -1,0 +1,79 @@
+/* ==========================================================================
+   Shared Form Styles
+   Canonical definitions for form elements used across all modules.
+   ========================================================================== */
+
+.form-group {
+  margin-bottom: 1.25rem;
+}
+
+.form-group label,
+.form-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.input,
+.form-input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: 0.95rem;
+  background-color: var(--color-white);
+  color: var(--text-primary);
+  transition: border-color var(--ease-default), box-shadow var(--ease-default);
+}
+
+.input:focus,
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-ink-strong);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+}
+
+.input::placeholder,
+.form-input::placeholder {
+  color: var(--color-gray-400);
+}
+
+.input.error,
+.form-input.error {
+  border-color: var(--color-error-strong);
+  background: #fef2f2;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox-container input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Select inputs */
+.form-select,
+select.input {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M3 5l3 3 3-3'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+}

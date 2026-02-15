@@ -4,8 +4,8 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 0;
   box-shadow: none;
   min-height: 0;
@@ -16,7 +16,7 @@
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .content-scrollable :is(.list-panel-header, .panel-header) h1,
@@ -24,7 +24,7 @@
   margin: 0;
   font-size: 1.125rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-gray-900);
   letter-spacing: -0.01em;
 }
 
@@ -47,9 +47,9 @@
 .content-scrollable .list-panel-actions .filters-btn,
 .content-scrollable .list-panel-actions .add-product-btn {
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
-  color: #374151;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--color-gray-700);
   font-weight: 500;
   font-size: 0.875rem;
   padding: 0.375rem 0.75rem;
@@ -63,8 +63,8 @@
 .content-scrollable .list-panel-actions button:hover,
 .content-scrollable .list-panel-actions .filters-btn:hover,
 .content-scrollable .list-panel-actions .add-product-btn:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-300);
   box-shadow: none;
 }
 
@@ -79,8 +79,8 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.375rem 0.5rem;
-  background: #ffffff;
-  border: 1.5px solid #d1d5db;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--color-gray-300);
   border-radius: 8px;
   box-shadow: none !important;
   margin-bottom: 0.5rem;
@@ -167,7 +167,7 @@
   top: 50%;
   left: 0.9rem;
   transform: translateY(-50%);
-  color: #94a3b8;
+  color: var(--color-slate-400);
   pointer-events: none;
   width: 16px;
   height: 16px;
@@ -178,7 +178,7 @@
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: #6b7280;
+  color: var(--color-gray-500);
   font-weight: 500;
   font-size: 0.875rem;
   padding: 0.375rem 0.625rem;
@@ -193,7 +193,7 @@
 
 .content-scrollable :is(.list-controls, .filter-bar) button:hover,
 .content-scrollable :is(.list-controls, .filter-bar) .filters-btn:hover {
-  background: #e5e7eb;
+  background: var(--color-gray-200);
   box-shadow: none;
 }
 
@@ -202,7 +202,7 @@
   padding: 0 0.9rem;
   border: 1px solid #e1e7ef;
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--bg-surface);
   color: #1f2330;
   font-weight: 500;
   font-size: 0.9rem;
@@ -211,7 +211,7 @@
 
 .content-scrollable .filter-bar select:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--color-blue-500);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
 }
 
@@ -223,14 +223,14 @@
   gap: 0.125rem;
   overflow-y: auto;
   min-height: 0;
-  background: #ffffff;
+  background: var(--bg-surface);
   box-shadow: none !important;
 }
 
 .content-scrollable :is(.list-item, .part-list-item, .po-list-item, .location-list-item, .supplier-list-item, .blueprint-list-item, .company-list-item, .orders-list-row, .nav-list li, .po-action-list li) {
   border-radius: 8px;
   border: 1px solid transparent;
-  background: #ffffff;
+  background: var(--bg-surface);
   padding: 0.75rem 0.875rem;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -238,15 +238,15 @@
 }
 
 .content-scrollable :is(.list-item, .part-list-item, .po-list-item, .location-list-item, .supplier-list-item, .blueprint-list-item, .company-list-item, .orders-list-row, .nav-list li, .po-action-list li):hover {
-  border-color: #e5e7eb;
-  background: #f9fafb;
+  border-color: var(--border-default);
+  background: var(--color-gray-50);
   box-shadow: none;
   transform: none;
 }
 
 .content-scrollable :is(.list-item.selected, .part-list-item.selected, .po-list-item.selected, .location-list-item.selected, .supplier-list-item.selected, .blueprint-list-item.selected, .company-list-item.selected, .orders-list-row.selected) {
-  border-color: #e5e7eb;
-  background: #f3f4f6;
+  border-color: var(--border-default);
+  background: var(--color-gray-100);
   box-shadow: none;
 }
 
@@ -254,21 +254,21 @@
   margin: 0 0 0.125rem;
   font-size: 0.875rem;
   font-weight: 600;
-  color: #111827;
+  color: var(--color-gray-900);
   letter-spacing: -0.01em;
 }
 
 .content-scrollable :is(.list-item p, .part-list-item p, .po-list-item p, .location-list-item p, .supplier-list-item p, .blueprint-list-item p, .company-list-item p) {
   margin: 0;
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--color-gray-500);
   line-height: 1.4;
 }
 
 .content-scrollable :is(.list-panel-footer, .po-pagination, .location-list-footer, .list-panel-toolbar) {
   padding: 0.75rem 1rem;
   border-top: none;
-  background: #ffffff;
+  background: var(--bg-surface);
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -280,7 +280,7 @@
   justify-content: center;
   gap: 0.5rem;
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--color-gray-500);
 }
 
 .content-scrollable :is(.pagination-btn, .po-pagination-btn) {
@@ -353,7 +353,7 @@
 
 .filter-modal {
   width: min(640px, 100%);
-  background: #ffffff;
+  background: var(--bg-surface);
   border-radius: 18px;
   border: 1px solid #ececec;
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.18);
@@ -430,7 +430,7 @@
 .filter-field select:focus {
   outline: none;
   border-color: #c4c4c4;
-  background: #ffffff;
+  background: var(--bg-surface);
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.03);
 }
 
@@ -464,8 +464,8 @@
 }
 
 .filter-btn.primary {
-  background: #111322;
-  color: #fff;
+  background: var(--color-ink);
+  color: var(--color-white);
   box-shadow: 0 16px 35px rgba(17, 19, 34, 0.25);
 }
 

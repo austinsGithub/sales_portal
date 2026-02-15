@@ -3,24 +3,31 @@
    ========================================================================== */
 
 :root {
-  --primary: #0f172a;
+  /* Legacy aliases — point to tokens.css values */
+  --primary: var(--color-ink-strong);
   --primary-hover: #0b1223;
   --primary-light: #e8ecf5;
-  --background: #ffffff;
-  --card-bg: #ffffff;
-  --text: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --border: #e2e8f0;
-  --border-light: #f1f5f9;
-  --border-radius: 12px;
-  --border-radius-sm: 8px;
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --background: var(--bg-surface);
+  --card-bg: var(--bg-surface);
+  --text: var(--color-ink-strong);
+  --text-secondary: var(--color-slate-600);
+  --text-muted: var(--color-slate-400);
+  --border: var(--color-slate-200);
+  --border-light: var(--color-slate-100);
+  --border-radius: var(--radius-lg);
+  --border-radius-sm: var(--radius-md);
+  --shadow-sm: var(--shadow-xs);
   --shadow-md: 0 4px 10px -4px rgb(15 23 42 / 0.12);
   --shadow-lg: 0 12px 30px -12px rgb(15 23 42 / 0.14);
-  --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --gradient-primary: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-  --gradient-secondary: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  --transition: all var(--ease-spring);
+  --gradient-primary: linear-gradient(135deg, var(--color-ink-strong) 0%, var(--color-slate-800) 100%);
+  --gradient-secondary: linear-gradient(135deg, var(--color-slate-800) 0%, var(--color-ink-strong) 100%);
+}
+
+/* Global app blur when admin modal is open (used by Users + Roles modals) */
+body.admin-modal-open #root {
+  filter: blur(6px);
+  transition: filter 0.2s ease;
 }
 
 /* ==========================================================================
@@ -31,7 +38,7 @@
   padding: 2rem;
   max-width: 1600px;
   margin: 0 auto;
-  min-height: calc(100vh - 80px);
+  min-height: 0;
   background: var(--background);
   position: relative;
 }
@@ -232,8 +239,7 @@
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
-  /* Ensures content card takes at least the height of the nav */
-  min-height: calc(100vh - 4rem - 50px); /* 100vh - padding - breadcrumb */
+  min-height: 0;
 }
 
 .settings-content .settings-card {
